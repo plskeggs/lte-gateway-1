@@ -923,6 +923,7 @@ static int cmd_info_scan(const struct shell *shell, size_t argc,
 	return 0;
 }
 
+void print_conns(void);
 static int cmd_info_conn(const struct shell *shell, size_t argc,
 				char **argv)
 {
@@ -941,6 +942,7 @@ static int cmd_info_conn(const struct shell *shell, size_t argc,
 		}
 	}
 	print_conn_info(shell, path, notify);
+	print_conns();
 	return 0;
 }
 
