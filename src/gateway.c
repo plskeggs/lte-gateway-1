@@ -3,7 +3,7 @@
 #include <net/mqtt.h>
 #include <net/socket.h>
 #include <bluetooth/gatt.h>
-#include <power/reboot.h>
+#include <sys/reboot.h>
 #include <nrf_modem.h>
 #include <logging/log.h>
 #include <logging/log_ctrl.h>

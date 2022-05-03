@@ -486,7 +486,7 @@ static uint8_t gatt_read_callback(struct bt_conn *conn, uint8_t err,
 
 		if (mem_ptr == NULL) {
 			LOG_ERR("Out of memory error in gatt_read_callback(): "
-				"%d queued notifications",
+				"%ld queued notifications",
 				atomic_get(&queued_notifications));
 			ret = BT_GATT_ITER_STOP;
 		} else {
@@ -684,7 +684,7 @@ static uint8_t on_received(struct bt_conn *conn,
 				} else  {
 					h = rx_data->sub_params.value_handle;
 				}
-				LOG_INF("Addr %s Handle %d Queued %d",
+				LOG_INF("Addr %s Handle %d Queued %ld",
 					log_strdup(rx_data->addr_trunc),
 					h,
 					atomic_get(&queued_notifications));
@@ -697,7 +697,7 @@ static uint8_t on_received(struct bt_conn *conn,
 
 		if (mem_ptr == NULL) {
 			LOG_ERR("Out of memory error in on_received(): "
-				"%d queued notifications",
+				"%ld queued notifications",
 				atomic_get(&queued_notifications));
 			ret = BT_GATT_ITER_STOP;
 		} else {
@@ -1438,7 +1438,7 @@ int ble_add_to_allowlist(char *addr_str, bool add)
 		goto done;
 	}
 
-	err = add ? bt_le_whitelist_add(&addr) : bt_le_whitelist_rem(&addr);
+	err = add ? bt_le_filter_accept_list_add(&addr) : bt_le_filter_accept_list_remove(&addr);
 	if (err) {
 		LOG_ERR("Error %s allowlist: %d", add ? "adding to" : "removing from", err);
 	}
@@ -1467,7 +1467,7 @@ void ble_stop_activity(void)
 	}
 
 	LOG_INF("Clear allowlist...");
-	err = bt_le_whitelist_clear();
+	err = bt_le_filter_accept_list_clear();
 	if (err) {
 		LOG_DBG("Error clearing allowlist: %d", err);
 	}

@@ -3,7 +3,7 @@
 #include <shell/shell.h>
 #include <shell/shell_uart.h>
 #include <shell/shell_history.h>
-#include <power/reboot.h>
+#include <sys/reboot.h>
 #include <version.h>
 #include <logging/log.h>
 #include <logging/log_ctrl.h>
@@ -14,7 +14,7 @@
 #include <time.h>
 #include <posix/time.h>
 #include <modem/modem_info.h>
-#include <modem/at_cmd.h>
+#include <nrf_modem_at.h>
 #include <modem/lte_lc.h>
 #include <net/cloud.h>
 #include <net/buf.h>
@@ -51,7 +51,9 @@ enum ble_cmd_type {
 extern uint32_t heap_stats(bool print);
 
 extern struct modem_param_info modem_param;
-static char response_buf[CONFIG_AT_CMD_RESPONSE_MAX_LEN];
+
+/* was: CONFIG_AT_CMD_RESPONSE_MAX_LEN]; */
+static char response_buf[1024];
 
 static void set_at_prompt(const struct shell *shell, bool at_mode);
 void peripheral_dfu_set_test_mode(bool test);
@@ -491,7 +493,7 @@ static void print_irq_info(const struct shell *shell)
 		if (entry == z_irq_spurious) {
 			continue;
 		}
-		shell_print(shell, "% 3d. %010p, %d, %d, %d, %d, %010p",
+		shell_print(shell, "% 3d. %10p, %d, %d, %d, %d, %10p",
 			    i, entry,
 			    NVIC_GetPriority(i), NVIC_GetEnableIRQ(i),
 			    NVIC_GetPendingIRQ(i), NVIC_GetActive(i),
@@ -769,7 +771,7 @@ static const char *get_cmd_param(size_t idx)
 
 uint32_t get_log_module_level(const struct shell *shell, const char *name)
 {
-	uint32_t modules_cnt = log_sources_count();
+	uint32_t modules_cnt = log_src_cnt_get(CONFIG_LOG_DOMAIN_ID);
 	const char *tmp_name;
 	uint32_t i;
 	uint32_t level = LOG_LEVEL_NONE;
@@ -1262,7 +1264,7 @@ static int app_cmd_at(const struct shell *shell, size_t argc, char **argv)
 		}
 	}
 
-	err = at_cmd_write(argv[1], response_buf, sizeof(response_buf), NULL);
+	err = nrf_modem_at_cmd(response_buf, sizeof(response_buf), "%s", argv[1]);
 	if (err) {
 		shell_error(shell, "ERROR");
 		return -EINVAL;
@@ -1312,7 +1314,6 @@ static int cmd_fota(const struct shell *shell, size_t argc, char **argv)
 	char *host = argv[1];
 	char *path = argv[2];
 	int sec_tag = CONFIG_NRF_CLOUD_SEC_TAG;
-	char *apn = NULL;
 	size_t frag = CONFIG_NRF_CLOUD_FOTA_DOWNLOAD_FRAGMENT_SIZE;
 
 	if (argc > 3) {
@@ -1321,19 +1322,16 @@ static int cmd_fota(const struct shell *shell, size_t argc, char **argv)
 	if (argc > 4) {
 		frag = atoll(argv[4]);
 	}
-	if (argc > 5) {
-		apn = argv[5];
-	}
 	shell_print(shell, "starting FOTA download from host:%s, path:%s, "
-			   "sec_tag:%d, apn:%s, frag_size:%zd",
-			   host, path, sec_tag, apn ? apn : "<n/a>", frag);
+			   "sec_tag:%d, frag_size:%zd",
+			   host, path, sec_tag, frag);
 
 	char *space = strstr(path, " ");
 
 	if (space) {
 		shell_print(shell, "mcuboot download detected");
 	}
-	int err = fota_download_start(host, path, sec_tag, apn, frag);
+	int err = fota_download_start(host, path, sec_tag, 0, frag);
 	if (err) {
 		shell_error(shell, "Error %d starting download", err);
 	}
@@ -1604,7 +1602,7 @@ SHELL_CMD_ARG_REGISTER(ble, &sub_ble, "Bluetooth commands", NULL, 0, 3);
 
 SHELL_CMD_ARG_REGISTER(fota, NULL, "<host> <path> [sec_tag] [frag_size] [apn] "
 				   "firmware over-the-air update.",
-		       cmd_fota, 2, 3);
+		       cmd_fota, 2, 2);
 SHELL_CMD_ARG_REGISTER(at, NULL, "<enable | AT<cmd> | exit> Execute an AT "
 				 "command.  Use <at enable> first to remain "
 				 "in AT command mode until 'exit'.",

@@ -526,7 +526,7 @@ int peripheral_dfu_start(const char *host, const char *file, int sec_tag,
 
 	struct download_client_cfg config = {
 		.sec_tag = sec_tag,
-		.apn = apn,
+		.pdn_id = 0,
 		.frag_size_override = fragment_size,
 		.set_tls_hostname = (sec_tag != -1),
 	};

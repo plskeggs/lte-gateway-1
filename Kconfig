@@ -100,7 +100,6 @@ choice
 
 config GPS_USE_SIM
 	bool "Use GPS simulator"
-	select GPS_SIM
 	select GPS_SIM_TRIGGER
 	help
 	  Use simulated GPS data.
