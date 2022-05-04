@@ -42,16 +42,16 @@ static void process_connection(int i)
 
 	/* Add devices to allowlist */
 	if (!dev->added_to_allowlist && !dev->shadow_updated && !dev->connected) {
-		if (!ble_add_to_allowlist(dev->addr, true)) {
-			dev->added_to_allowlist = true;
-			LOG_INF("Device added to allowlist.");
-		}
 		if (!dev->hidden) {
 			err = set_shadow_ble_conn(dev->addr, true, false);
 			if (!err) {
 				dev->shadow_updated = true;
 				LOG_INF("Shadow updated.");
 			}
+		}
+		if (!ble_add_to_allowlist(dev->addr, true)) {
+			dev->added_to_allowlist = true;
+			LOG_INF("Device added to allowlist.");
 		}
 	}
 

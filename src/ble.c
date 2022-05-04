@@ -1090,7 +1090,7 @@ int set_shadow_ble_conn(char *ble_address, bool connecting, bool connected)
 {
 	int err;
 
-	LOG_DBG("Connecting=%u, connected=%u", connecting, connected);
+	LOG_INF("Connecting=%u, connected=%u", connecting, connected);
 	k_mutex_lock(&output.lock, K_FOREVER);
 	err = device_shadow_data_encode(ble_address, connecting, connected,
 					&output);
@@ -1200,16 +1200,6 @@ static void connected(struct bt_conn *conn, uint8_t conn_err)
 		k_mutex_unlock(&output.lock);
 	}
 
-	if (!connection_ptr->connected) {
-		LOG_INF("Connected: %s", log_strdup(addr));
-		if (!connection_ptr->hidden) {
-			set_shadow_ble_conn(addr_trunc, false, true);
-		}
-		ble_conn_set_connected(connection_ptr, true);
-		ble_subscribe_device(conn, true);
-	} else {
-		LOG_INF("Reconnected: %s", log_strdup(addr));
-	}
 	if (connection_ptr->added_to_allowlist) {
 		if (!ble_add_to_allowlist(addr_trunc, false)) {
 			connection_ptr->added_to_allowlist = false;
@@ -1217,6 +1207,17 @@ static void connected(struct bt_conn *conn, uint8_t conn_err)
 	}
 
 	ui_led_set_pattern(UI_BLE_CONNECTED, PWM_DEV_1);
+
+	if (!connection_ptr->connected) {
+		LOG_INF("Connected: %s", log_strdup(addr));
+		ble_conn_set_connected(connection_ptr, true);
+		ble_subscribe_device(conn, true);
+		if (!connection_ptr->hidden) {
+			set_shadow_ble_conn(addr_trunc, false, true);
+		}
+	} else {
+		LOG_INF("Reconnected: %s", log_strdup(addr));
+	}
 
 	/* Start the timer to begin scanning again. */
 	k_timer_start(&auto_conn_start_timer, K_SECONDS(3), K_SECONDS(0));

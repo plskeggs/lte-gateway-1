@@ -1538,6 +1538,18 @@ static int cmd_logout(const struct shell *shell, size_t argc, char **argv)
 
 void cli_init(void)
 {
+	const struct shell *shell = shell_backend_uart_get_ptr();
+
+	if (shell) {
+		/*
+		 * Zephyr commit: SHA-1: 2b5723d4558619a9283683499c095e0b344d32d7
+                 *                shell: add init backend configuration
+		 * broke the config system regarding obscure, so for now,
+		 * set it manually on
+		 */
+		shell_obscure_set(shell, true);
+	}
+
 	shell_set_root_cmd("login");
 #if defined(CONFIG_STARTING_LOG_OVERRIDE)
 	for (int i = 0; i < log_src_cnt_get(CONFIG_LOG_DOMAIN_ID); i++) {

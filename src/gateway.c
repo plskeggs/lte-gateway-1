@@ -518,6 +518,7 @@ int g2c_send(const struct nrf_cloud_data *output)
 	msg.data.len = output->len;
 	msg.topic_type = NRF_CLOUD_TOPIC_MESSAGE;
 	msg.qos = MQTT_QOS_1_AT_LEAST_ONCE;
+	msg.id = 0;
 
 	return nrf_cloud_send(&msg);
 }
@@ -530,6 +531,7 @@ int gw_shadow_publish(const struct nrf_cloud_data *output)
 	msg.data.len = output->len;
 	msg.topic_type = NRF_CLOUD_TOPIC_STATE;
 	msg.qos = MQTT_QOS_1_AT_LEAST_ONCE;
+	msg.id = 0;
 
 	return nrf_cloud_send(&msg);
 }
