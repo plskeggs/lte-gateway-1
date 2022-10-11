@@ -136,7 +136,7 @@ static int svc_attr_data_add(const struct bt_gatt_service_val *gatt_service,
 	bt_uuid_get_str(gatt_service->uuid, str, sizeof(str));
 
 	bt_to_upper(str, strlen(str));
-	LOG_INF("Service %s", log_strdup(str));
+	LOG_INF("Service %s", str);
 
 	return ble_conn_mgr_add_uuid_pair(gatt_service->uuid, handle, 0, 0,
 					  BT_ATTR_SERVICE, ble_conn_ptr, true);
@@ -204,7 +204,7 @@ int ble_dm_data_add(struct bt_gatt_dm *dm)
 
 	err = ble_conn_mgr_get_conn_by_addr(addr_trunc, &ble_conn_ptr);
 	if (err) {
-		LOG_ERR("Connection not found for addr %s", log_strdup(addr_trunc));
+		LOG_ERR("Connection not found for addr %s", addr_trunc);
 		return err;
 	}
 
@@ -257,7 +257,7 @@ void send_notify_data(int unused1, int unused2, int unused3)
 					      &connected_ptr);
 		if (err) {
 			LOG_ERR("Connection not found for addr %s",
-				log_strdup(rx_data->addr_trunc));
+				rx_data->addr_trunc);
 			goto cleanup;
 		}
 
@@ -266,11 +266,11 @@ void send_notify_data(int unused1, int unused2, int unused3)
 		if (rx_data->read) {
 			handle = rx_data->read_params.single.handle;
 			LOG_INF("Read: Addr %s Handle %d",
-				log_strdup(rx_data->addr_trunc), handle);
+				rx_data->addr_trunc, handle);
 		} else {
 			handle = rx_data->sub_params.value_handle;
 			LOG_DBG("Notify Addr %s Handle %d",
-				log_strdup(rx_data->addr_trunc), handle);
+				rx_data->addr_trunc, handle);
 		}
 
 		err = ble_conn_mgr_get_uuid_by_handle(handle, uuid,
@@ -279,7 +279,7 @@ void send_notify_data(int unused1, int unused2, int unused3)
 			if (discover_in_progress) {
 				LOG_INF("Ignoring notification on %s due to BLE"
 					" discovery in progress",
-					log_strdup(rx_data->addr_trunc));
+					rx_data->addr_trunc);
 			} else {
 				LOG_ERR("Unable to convert handle: %d", err);
 			}
@@ -341,8 +341,8 @@ void send_notify_data(int unused1, int unused2, int unused3)
 			goto cleanup;
 		}
 		LOG_DBG("UUID %s, path %s, len %u, json %s",
-			log_strdup(uuid), log_strdup(path),
-			rx_data->length, log_strdup((char *)output.data.ptr));
+			uuid, path,
+			rx_data->length, (char *)output.data.ptr);
 		err = g2c_send(&output.data);
 		k_mutex_unlock(&output.lock);
 		if (err) {
@@ -391,7 +391,7 @@ static void discovery_service_not_found(struct bt_conn *conn, void *ctx)
 
 	err = ble_conn_mgr_get_conn_by_addr(addr_trunc, &connected_ptr);
 	if (err) {
-		LOG_ERR("Connection not found for addr %s", log_strdup(addr_trunc));
+		LOG_ERR("Connection not found for addr %s", addr_trunc);
 	} else {
 		/* only set discovered true and send results if it seems we were
 		 * successful at doing a full discovery
@@ -428,7 +428,7 @@ static void discovery_error_found(struct bt_conn *conn, int err, void *ctx)
 
 	err = ble_conn_mgr_get_conn_by_addr(addr_trunc, &connected_ptr);
 	if (err) {
-		LOG_ERR("Connection not found for addr %s", log_strdup(addr_trunc));
+		LOG_ERR("Connection not found for addr %s", addr_trunc);
 	} else {
 		connected_ptr->num_pairs = 0;
 		connected_ptr->discovering = false;
@@ -466,7 +466,7 @@ static uint8_t gatt_read_callback(struct bt_conn *conn, uint8_t err,
 
 		bt_to_upper(addr_trunc, BT_ADDR_LE_STR_LEN);
 
-		LOG_INF("Read Addr %s", log_strdup(addr_trunc));
+		LOG_INF("Read Addr %s", addr_trunc);
 
 		struct rec_data_t read_data = {
 			.fifo_reserved = NULL,
@@ -587,7 +587,7 @@ int gatt_write(const char *ble_addr, const char *chrc_uuid, uint8_t *data,
 	}
 
 	LOG_DBG("Writing to addr: %s to chrc %s with handle %d",
-		log_strdup(ble_addr), log_strdup(chrc_uuid), handle);
+		ble_addr, chrc_uuid, handle);
 	LOG_HEXDUMP_DBG(data, data_len, "Data to write");
 
 	params.func = cb ? cb : on_sent;
@@ -629,7 +629,7 @@ int gatt_write_without_response(char *ble_addr, char *chrc_uuid, uint8_t *data,
 	}
 
 	LOG_DBG("Writing w/o resp to addr: %s to chrc %s with handle %d",
-		log_strdup(ble_addr), log_strdup(chrc_uuid), handle);
+		ble_addr, chrc_uuid, handle);
 	LOG_HEXDUMP_DBG(data, data_len, "Data to write");
 
 	err = bt_gatt_write_without_response(conn, handle, data, data_len,
@@ -685,7 +685,7 @@ static uint8_t on_received(struct bt_conn *conn,
 					h = rx_data->sub_params.value_handle;
 				}
 				LOG_INF("Addr %s Handle %d Queued %ld",
-					log_strdup(rx_data->addr_trunc),
+					rx_data->addr_trunc,
 					h,
 					atomic_get(&queued_notifications));
 				k_free(rx_data);
@@ -739,7 +739,7 @@ int ble_subscribe(char *ble_addr, char *chrc_uuid, uint8_t value_type)
 
 	err = ble_conn_mgr_get_conn_by_addr(ble_addr, &connected_ptr);
 	if (err) {
-		LOG_ERR("Connection not found for addr %s", log_strdup(ble_addr));
+		LOG_ERR("Connection not found for addr %s", ble_addr);
 		return -ENOLINK;
 	}
 
@@ -784,7 +784,7 @@ int ble_subscribe(char *ble_addr, char *chrc_uuid, uint8_t value_type)
 			send_sub(ble_addr, path, &output, value);
 		}
 		LOG_INF("Unsubscribe: Addr %s Handle %d",
-			log_strdup(ble_addr), handle);
+			ble_addr, handle);
 
 		sub_value[param_index] = 0;
 		sub_conn[param_index] = NULL;
@@ -803,13 +803,13 @@ int ble_subscribe(char *ble_addr, char *chrc_uuid, uint8_t value_type)
 			send_sub(ble_addr, path, &output, value);
 		}
 		LOG_INF("Subscribe Dup: Addr %s Handle %d %s",
-			log_strdup(ble_addr), handle,
+			ble_addr, handle,
 			(value_type == BT_GATT_CCC_NOTIFY) ?
 			"Notify" : "Indicate");
 
 	} else if (value_type == 0) {
 		LOG_DBG("Unsubscribe N/A: Addr %s Handle %d",
-			log_strdup(ble_addr), handle);
+			ble_addr, handle);
 	} else if (curr_subs < SUBSCRIPTION_LIMIT) {
 		if (conn != NULL) {
 			sub_param[next_sub_index].notify = on_received;
@@ -838,7 +838,7 @@ int ble_subscribe(char *ble_addr, char *chrc_uuid, uint8_t value_type)
 			send_sub(ble_addr, path, &output, value);
 		}
 		LOG_INF("Subscribe: Addr %s Handle %d %s",
-			log_strdup(ble_addr), handle,
+			ble_addr, handle,
 			(value_type == BT_GATT_CCC_NOTIFY) ?
 			"Notify" : "Indicate");
 
@@ -870,14 +870,14 @@ int ble_subscribe_handle(char *ble_addr, uint16_t handle, uint8_t value_type)
 	struct ble_device_conn *conn_ptr;
 	int err;
 
-	LOG_DBG("Addr %s handle %u value_type %u", log_strdup(ble_addr),
+	LOG_DBG("Addr %s handle %u value_type %u", ble_addr,
 		handle, (unsigned)value_type);
 	err = ble_conn_mgr_get_conn_by_addr(ble_addr, &conn_ptr);
 	if (err == 0) {
 		err = ble_conn_mgr_get_uuid_by_handle(handle, uuid, conn_ptr);
 		if (err == 0) {
 			LOG_DBG("Subscribing uuid %s",
-				log_strdup(uuid));
+				uuid);
 			err = ble_subscribe(ble_addr, uuid, value_type);
 		}
 	}
@@ -934,7 +934,7 @@ int ble_subscribe_device(struct bt_conn *conn, bool subscribe)
 
 	err = ble_conn_mgr_get_conn_by_addr(addr_trunc, &connected_ptr);
 	if (err) {
-		LOG_ERR("Connection not found for addr %s", log_strdup(addr_trunc));
+		LOG_ERR("Connection not found for addr %s", addr_trunc);
 		return -EINVAL;
 	}
 
@@ -947,7 +947,7 @@ int ble_subscribe_device(struct bt_conn *conn, bool subscribe)
 				ble_conn_mgr_set_subscribed(handle, i,
 							    connected_ptr);
 				LOG_INF("Subscribe: Addr %s Handle %d Idx %d",
-					log_strdup(addr_trunc), handle, i);
+					addr_trunc, handle, i);
 				count++;
 			} else {
 				bt_gatt_unsubscribe(conn, &sub_param[i]);
@@ -958,7 +958,7 @@ int ble_subscribe_device(struct bt_conn *conn, bool subscribe)
 					curr_subs--;
 				}
 				LOG_INF("Unsubscribe: Addr %s Handle %d Idx %d",
-					log_strdup(addr_trunc), handle, i);
+					addr_trunc, handle, i);
 				count++;
 			}
 		}
@@ -979,7 +979,7 @@ int ble_discover(struct ble_device_conn *connection_ptr)
 	char *ble_addr = connection_ptr->addr;
 	struct bt_conn *conn = NULL;
 
-	LOG_INF("Discovering: %s\n", log_strdup(ble_addr));
+	LOG_INF("Discovering: %s\n", ble_addr);
 
 	if (!discover_in_progress) {
 
@@ -1179,10 +1179,10 @@ static void connected(struct bt_conn *conn, uint8_t conn_err)
 	bt_to_upper(addr_trunc, BT_ADDR_LE_STR_LEN);
 	err = ble_conn_mgr_get_conn_by_addr(addr_trunc, &connection_ptr);
 	if (err) {
-		LOG_ERR("Connection not found for addr %s", log_strdup(addr_trunc));
+		LOG_ERR("Connection not found for addr %s", addr_trunc);
 	}
 	if (conn_err || err) {
-		LOG_ERR("Failed to connect to %s (%u)", log_strdup(addr),
+		LOG_ERR("Failed to connect to %s (%u)", addr,
 			conn_err);
 		if (connection_ptr) {
 			ble_conn_set_connected(connection_ptr, false);
@@ -1209,14 +1209,14 @@ static void connected(struct bt_conn *conn, uint8_t conn_err)
 	ui_led_set_pattern(UI_BLE_CONNECTED, PWM_DEV_1);
 
 	if (!connection_ptr->connected) {
-		LOG_INF("Connected: %s", log_strdup(addr));
+		LOG_INF("Connected: %s", addr);
 		ble_conn_set_connected(connection_ptr, true);
 		ble_subscribe_device(conn, true);
 		if (!connection_ptr->hidden) {
 			set_shadow_ble_conn(addr_trunc, false, true);
 		}
 	} else {
-		LOG_INF("Reconnected: %s", log_strdup(addr));
+		LOG_INF("Reconnected: %s", addr);
 	}
 
 	/* Start the timer to begin scanning again. */
@@ -1251,7 +1251,7 @@ static void disconnected(struct bt_conn *conn, uint8_t reason)
 	 * shadow; it will likely reconnect shortly
 	 */
 	if (reason != BT_HCI_ERR_REMOTE_USER_TERM_CONN) {
-		LOG_INF("Disconnected: %s (reason 0x%02x)", log_strdup(addr),
+		LOG_INF("Disconnected: %s (reason 0x%02x)", addr,
 			reason);
 		if (connection_ptr && !connection_ptr->hidden) {
 			(void)set_shadow_ble_conn(addr_trunc, false, false);
@@ -1357,7 +1357,7 @@ static void device_found(const bt_addr_le_t *addr, int8_t rssi, uint8_t type,
 	num_devices_found++;
 
 	LOG_INF("%d. %s, %d, %s", num_devices_found,
-		log_strdup(scanned->addr), rssi, log_strdup(scanned->name));
+		scanned->addr, rssi, scanned->name);
 }
 
 struct ble_scanned_dev *get_scanned_device(unsigned int i)
@@ -1429,7 +1429,7 @@ int ble_add_to_allowlist(char *addr_str, bool add)
 	bt_addr_le_t addr;
 
 	LOG_INF("%s allowlist: %s", add ? "Adding address to" : "Removing address from",
-		log_strdup(addr_str));
+		addr_str);
 
 	bt_conn_create_auto_stop();
 
@@ -1483,7 +1483,7 @@ void ble_stop_activity(void)
 			ret = disconnect_device_by_addr(conn->addr);
 			if (ret) {
 				LOG_DBG("Error disconnecting %s",
-					log_strdup(conn->addr));
+					conn->addr);
 			}
 		}
 	}

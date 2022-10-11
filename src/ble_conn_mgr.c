@@ -64,7 +64,7 @@ static void process_connection(int i)
 
 		if (!err) {
 			LOG_DBG("ble_discover(%s) failed: %d",
-				log_strdup(dev->addr), err);
+				dev->addr, err);
 		}
 	}
 
@@ -128,7 +128,7 @@ static void ble_conn_mgr_conn_reset(struct ble_device_conn
 {
 	struct uuid_handle_pair *uuid_handle;
 
-	LOG_INF("Connection removed to %s", log_strdup(dev->addr));
+	LOG_INF("Connection removed to %s", dev->addr);
 
 	if (!dev->free) {
 		if (num_connected) {
@@ -175,7 +175,7 @@ void ble_conn_mgr_update_connections(void)
 				int err;
 
 				LOG_INF("Cloud: disconnect device %s",
-					log_strdup(dev->addr));
+					dev->addr);
 				if (dev->added_to_allowlist) {
 					if (!ble_add_to_allowlist(dev->addr, false)) {
 						dev->added_to_allowlist = false;
@@ -206,7 +206,7 @@ void ble_conn_mgr_change_desired(const char *addr, uint8_t index,
 
 		LOG_INF("Desired Connection %s: %s %s",
 			active ? "Added" : "Removed",
-			log_strdup(addr),
+			addr,
 			manual ? "(manual)" : "");
 	}
 }
@@ -332,7 +332,7 @@ int ble_conn_mgr_generate_path(struct ble_device_conn *conn_ptr,
 	uuid_handle = find_pair_by_handle(handle, conn_ptr, &i);
 	if (uuid_handle == NULL) {
 		LOG_ERR("Path not generated; handle %u not found for addr %s",
-			handle, log_strdup(conn_ptr->addr));
+			handle, conn_ptr->addr);
 		return -ENXIO;
 	}
 
@@ -346,7 +346,7 @@ int ble_conn_mgr_generate_path(struct ble_device_conn *conn_ptr,
 		if (uuid_handle == NULL) {
 			LOG_ERR("Path not generated; handle after %u "
 				"not found for addr %s",
-				handle, log_strdup(conn_ptr->addr));
+				handle, conn_ptr->addr);
 			return -ENXIO;
 		}
 		get_uuid_str(uuid_handle, ccc_uuid, BT_UUID_STR_LEN);
@@ -365,7 +365,7 @@ int ble_conn_mgr_generate_path(struct ble_device_conn *conn_ptr,
 			get_uuid_str(uuid_handle, service_uuid,
 				     BT_UUID_STR_LEN);
 			LOG_DBG("Service uuid in path %s",
-				log_strdup(service_uuid));
+				service_uuid);
 			break;
 		}
 	}
@@ -382,7 +382,7 @@ int ble_conn_mgr_generate_path(struct ble_device_conn *conn_ptr,
 	memset(path, 0, BT_MAX_PATH_LEN);
 	memcpy(path, path_str, strlen(path_str));
 
-	LOG_DBG("Generated Path: %s", log_strdup(path_str));
+	LOG_DBG("Generated Path: %s", path_str);
 	return 0;
 }
 
@@ -415,7 +415,7 @@ int ble_conn_mgr_add_conn(const char *addr)
 		LOG_ERR("Address from string failed (err %d)", err);
 	}
 	num_connected++;
-	LOG_INF("BLE conn to %s added to manager", log_strdup(addr));
+	LOG_INF("BLE conn to %s added to manager", addr);
 	return err;
 }
 
@@ -441,7 +441,7 @@ int ble_conn_mgr_rediscover(const char *addr)
 
 	err = ble_conn_mgr_get_conn_by_addr(addr, &connected_ble_ptr);
 	if (err) {
-		LOG_ERR("Connection not found for addr %s", log_strdup(addr));
+		LOG_ERR("Connection not found for addr %s", addr);
 		return err;
 	}
 
@@ -449,7 +449,7 @@ int ble_conn_mgr_rediscover(const char *addr)
 		if (connected_ble_ptr->discovered) {
 			/* cloud wants data again; just send it */
 			LOG_INF("Skipping device discovery on %s",
-				log_strdup(connected_ble_ptr->addr));
+				connected_ble_ptr->addr);
 			if (connected_ble_ptr->connected) {
 				connected_ble_ptr->encode_discovered = true;
 			} else {
@@ -495,13 +495,13 @@ int ble_conn_mgr_force_dfu_rediscover(const char *addr)
 
 	err = ble_conn_mgr_get_conn_by_addr(addr, &connected_ble_ptr);
 	if (err) {
-		LOG_ERR("Connection not found for addr %s", log_strdup(addr));
+		LOG_ERR("Connection not found for addr %s", addr);
 		return err;
 	}
 
 	if (!connected_ble_ptr->discovering) {
 		LOG_INF("Marking device %s to be rediscovered",
-			log_strdup(addr));
+			addr);
 		connected_ble_ptr->discovered = false;
 		connected_ble_ptr->num_pairs = 0;
 	}
@@ -516,7 +516,7 @@ int ble_conn_mgr_remove_conn(const char *addr)
 
 	err = ble_conn_mgr_get_conn_by_addr(addr, &connected_ble_ptr);
 	if (err) {
-		LOG_ERR("Connection not found for addr %s", log_strdup(addr));
+		LOG_ERR("Connection not found for addr %s", addr);
 		return err;
 	}
 
@@ -550,7 +550,7 @@ void ble_conn_mgr_check_pending(void)
 				continue;
 			}
 			LOG_INF("Requesting pending DFU job for %s",
-				log_strdup(conn_ptr->addr));
+				conn_ptr->addr);
 			nrf_cloud_fota_ble_update_check(&conn_ptr->bt_addr.a);
 			break;
 		}
@@ -665,13 +665,13 @@ int ble_conn_mgr_get_uuid_by_handle(uint16_t handle, char *uuid,
 		bt_to_upper(uuid_str, strlen(uuid_str));
 		memcpy(uuid, uuid_str, strlen(uuid_str));
 		LOG_DBG("Found UUID: %s For Handle: %d",
-			log_strdup(uuid_str),
+			uuid_str,
 			handle);
 		return 0;
 	}
 
 	LOG_ERR("Handle %u on addr %s not found; num pairs: %d", handle,
-		log_strdup(conn_ptr->addr),
+		conn_ptr->addr,
 		(int)conn_ptr->num_pairs);
 	return 1;
 }
@@ -694,8 +694,8 @@ int ble_conn_mgr_get_handle_by_uuid(uint16_t *handle, const char *uuid,
 
 		get_uuid_str(uuid_handle, str, sizeof(str));
 		bt_to_upper(str, strlen(str));
-		LOG_DBG("UUID IN: %s UUID FOUND: %s", log_strdup(uuid),
-			log_strdup(str));
+		LOG_DBG("UUID IN: %s UUID FOUND: %s", uuid,
+			str);
 
 		if (!strcmp(uuid, str)) {
 			*handle = uuid_handle->handle;
@@ -705,8 +705,8 @@ int ble_conn_mgr_get_handle_by_uuid(uint16_t *handle, const char *uuid,
 
 		get_uuid_str(uuid_handle, str, sizeof(str));
 		bt_to_upper(str, strlen(str));
-		LOG_DBG("UUID IN: %s UUID FOUND: %s", log_strdup(uuid),
-			log_strdup(str));
+		LOG_DBG("UUID IN: %s UUID FOUND: %s", uuid,
+			str);
 		if (!strcmp(uuid, str)) {
 			*handle = uuid_handle->handle;
 			LOG_DBG("128 Bit UUID Found");
@@ -714,7 +714,7 @@ int ble_conn_mgr_get_handle_by_uuid(uint16_t *handle, const char *uuid,
 		}
 	}
 
-	LOG_ERR("Handle Not Found for UUID: %s", log_strdup(uuid));
+	LOG_ERR("Handle Not Found for UUID: %s", uuid);
 	return 1;
 }
 
@@ -733,7 +733,7 @@ int ble_conn_mgr_add_uuid_pair(const struct bt_uuid *uuid, uint16_t handle,
 
 	if (conn_ptr->num_pairs >= MAX_UUID_PAIRS) {
 		LOG_ERR("Max uuid pair limit reached on %s",
-			log_strdup(conn_ptr->addr));
+			conn_ptr->addr);
 		return -E2BIG;
 	}
 
@@ -775,7 +775,7 @@ int ble_conn_mgr_add_uuid_pair(const struct bt_uuid *uuid, uint16_t handle,
 		uuid_handle->uuid_type = uuid->type;
 		bt_uuid_get_str(&uuid_handle->uuid_16.uuid, str, sizeof(str));
 
-		LOG_DBG("\tCONN MGR Characteristic: 0x%s", log_strdup(str));
+		LOG_DBG("\tCONN MGR Characteristic: 0x%s", str);
 		break;
 	case BT_UUID_TYPE_128:
 		if (uuid_handle == NULL) {
@@ -793,7 +793,7 @@ int ble_conn_mgr_add_uuid_pair(const struct bt_uuid *uuid, uint16_t handle,
 		uuid_handle->uuid_type = uuid->type;
 		bt_uuid_get_str(&uuid_handle->uuid_128.uuid, str, sizeof(str));
 
-		LOG_DBG("\tCONN MGR Characteristic: 0x%s", log_strdup(str));
+		LOG_DBG("\tCONN MGR Characteristic: 0x%s", str);
 		break;
 	default:
 		err = -EINVAL;

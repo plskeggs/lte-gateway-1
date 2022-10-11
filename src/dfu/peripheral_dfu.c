@@ -35,8 +35,6 @@ LOG_MODULE_REGISTER(peripheral_dfu, CONFIG_NRF_CLOUD_FOTA_LOG_LEVEL);
 				}				     \
 		      } while (false)
 
-#define STRDUP(x) use_printk ? (x) : log_strdup(x)
-
 enum nrf_dfu_op_t {
   NRF_DFU_OP_PROTOCOL_VERSION = 0x00,
   NRF_DFU_OP_OBJECT_CREATE = 0x01,
@@ -226,7 +224,7 @@ static int notification_callback(const char *addr, const char *chrc_uuid,
 {
 	if ((strcmp(addr, ble_norm_addr) != 0) &&
 	    (strcmp(addr, ble_dfu_addr) != 0)) {
-		LOG_WRN("Notification received for %s (not us)", log_strdup(addr));
+		LOG_WRN("Notification received for %s (not us)", addr);
 		return 0; /* not for us */
 	}
 	/** @TODO: implement bonded mode also */
@@ -236,7 +234,7 @@ static int notification_callback(const char *addr, const char *chrc_uuid,
 	else if (strcmp(chrc_uuid, DFU_CONTROL_POINT_UUID) == 0) {
 		normal_mode = false;
 	} else {
-		LOG_WRN("Notification received for wrong UUID:%s", log_strdup(chrc_uuid));
+		LOG_WRN("Notification received for wrong UUID:%s", chrc_uuid);
 		return 0; /* not for us */
 	}
 	notify_length = MIN(len, sizeof(dfu_notify_data));
@@ -365,9 +363,9 @@ static int decode_dfu(void)
 	}
 	if (p->result == NRF_DFU_RES_CODE_SUCCESS) {
 		if (verbose) {
-			LOG_INF("%s", log_strdup(buf));
+			LOG_INF("%s", buf);
 		} else {
-			LOG_DBG("%s", log_strdup(buf));
+			LOG_DBG("%s", buf);
 		}
 		return 0;
 	} else if (p->result == NRF_DFU_RES_CODE_EXT_ERROR) {
@@ -418,7 +416,7 @@ int peripheral_dfu_config(const char *addr, int size, const char *version,
 
 	err = ble_conn_mgr_get_conn_by_addr(addr, &conn);
 	if (err) {
-		LOG_ERR("Connection not found for addr %s", log_strdup(addr));
+		LOG_ERR("Connection not found for addr %s", addr);
 		return err;
 	}
 
@@ -455,7 +453,7 @@ int peripheral_dfu_config(const char *addr, int size, const char *version,
 	err = ble_conn_mgr_get_conn_by_addr(ble_dfu_addr, &conn);
 	if (err) {
 		LOG_INF("Adding temporary connection to %s for DFU",
-			log_strdup(ble_dfu_addr));
+			ble_dfu_addr);
 		err = ble_conn_mgr_add_conn(ble_dfu_addr);
 		if (err) {
 			goto failed;
@@ -734,16 +732,16 @@ static void fota_ble_callback(const struct nrf_cloud_fota_ble_job *
 
 	LOG_INF("Starting BLE DFU to addr:%s, from host:%s, size:%d, "
 		"init:%d, ver:%s, crc:%u, sec_tag:%d, apn:%s, frag_size:%zd",
-		log_strdup(addr), log_strdup(fota_ble_job.info.host),
+		addr, fota_ble_job.info.host,
 		fota_ble_job.info.file_size,
-		init_packet, log_strdup(ver), crc, sec_tag,
-		apn ? log_strdup(apn) : "<n/a>", frag);
+		init_packet, ver, crc, sec_tag,
+		apn ? apn : "<n/a>", frag);
 	LOG_INF("Num files:%d", num_fota_files);
 	for (i = 0; i < MAX_FOTA_FILES; i++) {
 		if (!fota_files[i].path) {
 			break;
 		}
-		LOG_INF("File:%d path:%s", i + 1, log_strdup(fota_files[i].path));
+		LOG_INF("File:%d path:%s", i + 1, fota_files[i].path);
 	}
 
 	(void)start_ble_job(&fota_ble_job);
@@ -787,8 +785,8 @@ static bool start_next_job(void)
 
 	LOG_INF("Starting second BLE DFU to addr:%s, from host:%s, "
 		"path:%s, size:%d, init:%d",
-		log_strdup(ble_dfu_addr), log_strdup(fota_ble_job.info.host),
-		log_strdup(fota_ble_job.info.path), fota_ble_job.info.file_size,
+		ble_dfu_addr, fota_ble_job.info.host,
+		fota_ble_job.info.path, fota_ble_job.info.file_size,
 		init_packet);
 
 	int err = start_ble_job(&fota_ble_job);
@@ -883,7 +881,7 @@ static uint8_t peripheral_dfu(const char *buf, size_t len)
 
 	if (first_fragment) {
 		first_fragment = false;
-		LOGPKINF("BLE DFU starting to %s...", STRDUP(ble_dfu_addr));
+		LOGPKINF("BLE DFU starting to %s...", ble_dfu_addr);
 
 		if (fota_ble_job.info.id) {
 			fota_ble_job.dl_progress = (100 * total_completed_size) /

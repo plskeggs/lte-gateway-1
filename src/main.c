@@ -20,7 +20,6 @@
 #include <modem/lte_lc.h>
 #include <modem/modem_info.h>
 #endif /* CONFIG_NRF_MODEM_LIB */
-#include <net/cloud.h>
 #include <net/socket.h>
 #include <net/nrf_cloud.h>
 #undef __XSI_VISIBLE
@@ -31,10 +30,6 @@
 #include <settings/settings.h>
 #include <debug/cpu_load.h>
 #include <date_time.h>
-
-#if defined(CONFIG_LWM2M_CARRIER)
-#include <lwm2m_carrier.h>
-#endif
 
 #if defined(CONFIG_BOOTLOADER_MCUBOOT)
 #include <dfu/mcuboot.h>
@@ -123,7 +118,6 @@ struct rsrp_data {
 K_THREAD_STACK_DEFINE(application_stack_area,
 		      CONFIG_APPLICATION_WORKQUEUE_STACK_SIZE);
 static struct k_work_q application_work_q;
-static struct cloud_backend *cloud_backend;
 
 /* Sensor data */
 
@@ -157,12 +151,6 @@ static struct k_work no_sim_go_offline_work;
 #define MODEM_AT_CMD_MAX_RESPONSE_LEN (2000)
 static K_SEM_DEFINE(modem_at_cmd_sem, 1, 1);
 static K_SEM_DEFINE(cloud_disconnected, 0, 1);
-#if defined(CONFIG_LWM2M_CARRIER)
-static void app_disconnect(void);
-static K_SEM_DEFINE(nrf_modem_initialized, 0, 1);
-static K_SEM_DEFINE(lte_connected, 0, 1);
-static K_SEM_DEFINE(cloud_ready_to_connect, 0, 1);
-#endif
 static bool cloud_connection_enabled = true;
 static bool cloud_connection_status;
 static bool lte_connection_status;
@@ -184,7 +172,7 @@ enum error_type {
 
 static void work_init(void);
 static void cycle_cloud_connection(struct k_work *work);
-static void connection_evt_handler(const struct cloud_event *const evt);
+static void connection_evt_handler(const struct nrf_cloud_evt *const evt);
 static void no_sim_go_offline(struct k_work *work);
 static void date_time_event_handler(const struct date_time_evt *evt);
 struct modem_param_info * query_modem_info(void);
@@ -221,97 +209,6 @@ static void shutdown_modem(void)
 	nrf_modem_lib_shutdown();
 #endif
 }
-
-#if defined(CONFIG_LWM2M_CARRIER)
-int lwm2m_carrier_event_handler(const lwm2m_carrier_event_t *event)
-{
-	switch (event->type) {
-	case LWM2M_CARRIER_EVENT_BSDLIB_INIT:
-		LOG_INF("LWM2M_CARRIER_EVENT_BSDLIB_INIT");
-		k_sem_give(&nrf_modem_initialized);
-		break;
-	case LWM2M_CARRIER_EVENT_CONNECTING:
-		LOG_INF("LWM2M_CARRIER_EVENT_CONNECTING\n");
-		break;
-	case LWM2M_CARRIER_EVENT_CONNECTED:
-		LOG_INF("LWM2M_CARRIER_EVENT_CONNECTED");
-		k_sem_give(&lte_connected);
-		break;
-	case LWM2M_CARRIER_EVENT_DISCONNECTING:
-		LOG_INF("LWM2M_CARRIER_EVENT_DISCONNECTING");
-		break;
-	case LWM2M_CARRIER_EVENT_BOOTSTRAPPED:
-		LOG_INF("LWM2M_CARRIER_EVENT_BOOTSTRAPPED");
-		break;
-	case LWM2M_CARRIER_EVENT_DISCONNECTED:
-		LOG_INF("LWM2M_CARRIER_EVENT_DISCONNECTED");
-		break;
-	case LWM2M_CARRIER_EVENT_LTE_READY:
-		LOG_INF("LWM2M_CARRIER_EVENT_LTE_READY");
-		break;
-	case LWM2M_CARRIER_EVENT_REGISTERED:
-		LOG_INF("LWM2M_CARRIER_EVENT_REGISTERED");
-		k_sem_give(&cloud_ready_to_connect);
-		break;
-	case LWM2M_CARRIER_EVENT_FOTA_START:
-		LOG_INF("LWM2M_CARRIER_EVENT_FOTA_START");
-		/* Due to limitations in the number of secure sockets,
-		 * the cloud socket has to be closed when the carrier
-		 * library initiates firmware upgrade download.
-		 */
-		atomic_set(&carrier_requested_disconnect, 1);
-		app_disconnect();
-		break;
-	case LWM2M_CARRIER_EVENT_REBOOT:
-		LOG_INF("LWM2M_CARRIER_EVENT_REBOOT");
-		break;
-	case LWM2M_CARRIER_EVENT_ERROR:
-		LOG_ERR("LWM2M_CARRIER_EVENT_ERROR: code %d, value %d",
-			((lwm2m_carrier_event_error_t *)event->data)->code,
-			((lwm2m_carrier_event_error_t *)event->data)->value);
-		break;
-	}
-
-	return 0;
-}
-
-/**@brief Disconnects from cloud. First it tries using the cloud backend's
- *        disconnect() implementation. If that fails, it falls back to close the
- *        socket directly, using close().
- */
-static void app_disconnect(void)
-{
-	int err;
-
-	atomic_set(&cloud_association, CLOUD_ASSOCIATION_STATE_INIT);
-	LOG_INF("Disconnecting from cloud.");
-
-	err = cloud_disconnect(cloud_backend);
-	if (err == 0) {
-		/* Ensure that the socket is indeed closed before returning. */
-		if (k_sem_take(&cloud_disconnected, K_MINUTES(1)) == 0) {
-			LOG_INF("Disconnected from cloud.");
-			return;
-		}
-	} else if (err == -ENOTCONN) {
-		LOG_INF("Cloud connection was not established.");
-		return;
-	} else {
-		LOG_ERR("Could not disconnect from cloud, err: %d", err);
-	}
-
-	LOG_INF("Closing the cloud socket directly.");
-
-	err = close(cloud_backend->config->socket);
-	if (err) {
-		LOG_ERR("Failed to close socket, error: %d", err);
-		return;
-	}
-
-	LOG_INF("Socket was closed successfully.");
-	return;
-}
-#endif /* defined(CONFIG_LWM2M_CARRIER) */
 
 void set_log_panic(void)
 {
@@ -390,12 +287,11 @@ void cloud_error_handler(int err)
 	error_handler(ERROR_CLOUD, err);
 }
 
-void cloud_connect_error_handler(enum cloud_connect_result err)
+void cloud_connect_error_handler(enum nrf_cloud_connect_result err)
 {
 	bool reboot = true;
-	char *backend_name = "invalid";
 
-	if (err == CLOUD_CONNECT_RES_SUCCESS) {
+	if (err == NRF_CLOUD_CONNECT_RES_SUCCESS) {
 		return;
 	}
 
@@ -408,50 +304,45 @@ void cloud_connect_error_handler(enum cloud_connect_result err)
 	LOG_ERR("Failed to connect to cloud, error %d", err);
 
 	switch (err) {
-	case CLOUD_CONNECT_RES_ERR_NOT_INITD: {
+	case NRF_CLOUD_CONNECT_RES_ERR_NOT_INITD: {
 		LOG_ERR("Cloud back-end has not been initialized");
 		/* no need to reboot, program error */
 		reboot = false;
 		break;
 	}
-	case CLOUD_CONNECT_RES_ERR_NETWORK: {
+	case NRF_CLOUD_CONNECT_RES_ERR_NETWORK: {
 		LOG_ERR("Network error, check cloud configuration");
 		break;
 	}
-	case CLOUD_CONNECT_RES_ERR_BACKEND: {
-		if (cloud_backend && cloud_backend->config &&
-		    cloud_backend->config->name) {
-			backend_name = cloud_backend->config->name;
-		}
-		LOG_ERR("An error occurred specific to the cloud back-end: %s",
-			log_strdup(backend_name));
+	case NRF_CLOUD_CONNECT_RES_ERR_BACKEND: {
+		LOG_ERR("An error occurred on the cloud backen");
 		break;
 	}
-	case CLOUD_CONNECT_RES_ERR_PRV_KEY: {
+	case NRF_CLOUD_CONNECT_RES_ERR_PRV_KEY: {
 		LOG_ERR("Ensure device has a valid private key");
 		break;
 	}
-	case CLOUD_CONNECT_RES_ERR_CERT: {
+	case NRF_CLOUD_CONNECT_RES_ERR_CERT: {
 		LOG_ERR("Ensure device has a valid CA and client certificate");
 		break;
 	}
-	case CLOUD_CONNECT_RES_ERR_CERT_MISC: {
+	case NRF_CLOUD_CONNECT_RES_ERR_CERT_MISC: {
 		LOG_ERR("A certificate/authorization error has occurred");
 		break;
 	}
-	case CLOUD_CONNECT_RES_ERR_TIMEOUT_NO_DATA: {
+	case NRF_CLOUD_CONNECT_RES_ERR_TIMEOUT_NO_DATA: {
 		LOG_ERR("Connect timeout. SIM card may be out of data");
 		break;
 	}
-	case CLOUD_CONNECT_RES_ERR_ALREADY_CONNECTED: {
+	case NRF_CLOUD_CONNECT_RES_ERR_ALREADY_CONNECTED: {
 		LOG_ERR("Connection already exists.");
 		break;
 	}
-	case CLOUD_CONNECT_RES_ERR_MISC: {
+	case NRF_CLOUD_CONNECT_RES_ERR_MISC: {
 		break;
 	}
 	default: {
-		LOG_ERR("Unhandled connect error");
+		LOG_ERR("Unhandled connect error: %d", err);
 		break;
 	}
 	}
@@ -490,9 +381,7 @@ void connect_to_cloud(const int32_t connect_delay_s)
 
 	if (atomic_get(&carrier_requested_disconnect)) {
 		/* A disconnect was requested to free up the TLS socket
-		 * used by the cloud.  If enabled, the carrier library
-		 * (CONFIG_LWM2M_CARRIER) will perform FOTA updates in
-		 * the background and reboot the device when complete.
+		 * used by the cloud.
 		 */
 		return;
 	}
@@ -534,8 +423,8 @@ static void cloud_connect_work_fn(struct k_work *work)
 	ui_led_set_pattern(UI_CLOUD_CONNECTING, PWM_DEV_0);
 
 	/* Attempt cloud connection */
-	ret = cloud_connect(cloud_backend);
-	if (ret != CLOUD_CONNECT_RES_SUCCESS) {
+	ret = nrf_cloud_connect(NULL);
+	if (ret != NRF_CLOUD_CONNECT_RES_SUCCESS) {
 		k_work_cancel_delayable(&cloud_reboot_work);
 		/* Will not return from this function.
 		 * If the connect fails here, it is likely
@@ -559,7 +448,7 @@ static void cloud_reboot_handler(struct k_work *work)
 }
 
 /**@brief nRF Cloud specific callback for cloud association event. */
-static void on_user_pairing_req(const struct cloud_event *evt)
+static void on_user_pairing_req(void)
 {
 	if (atomic_get(&cloud_association) !=
 		       CLOUD_ASSOCIATION_STATE_REQUESTED) {
@@ -596,7 +485,7 @@ static void cycle_cloud_connection(struct k_work *work)
 	LOG_INF("Disconnecting from cloud...");
 	cloud_connection_status = false;
 
-	if (cloud_disconnect(cloud_backend) != 0) {
+	if (nrf_cloud_disconnect() != 0) {
 		reboot_wait_ms = 5 * MSEC_PER_SEC;
 		LOG_INF("Disconnect failed. Device will reboot in %d seconds",
 			(reboot_wait_ms / MSEC_PER_SEC));
@@ -629,14 +518,14 @@ void on_pairing_done(void)
 	}
 }
 
-void fota_done_handler(const struct cloud_event *const evt)
+void fota_done_handler(const struct nrf_cloud_evt *const evt)
 {
 	lte_connection_status = false;
 #if defined(CONFIG_NRF_CLOUD_FOTA)
 	enum nrf_cloud_fota_type fota_type = NRF_CLOUD_FOTA_TYPE__INVALID;
 
-	if (evt && evt->data.msg.buf) {
-		fota_type = *(enum nrf_cloud_fota_type *)evt->data.msg.buf;
+	if (evt && evt->data.ptr) {
+		fota_type = *(enum nrf_cloud_fota_type *)evt->data.ptr;
 		LOG_INF("FOTA type: %d", fota_type);
 	}
 #endif
@@ -652,21 +541,18 @@ void fota_done_handler(const struct cloud_event *const evt)
 #endif
 }
 
-void cloud_event_handler(const struct cloud_backend *const backend,
-			 const struct cloud_event *const evt,
-			 void *user_data)
+void cloud_event_handler(const struct nrf_cloud_evt *const evt)
 {
-	ARG_UNUSED(user_data);
 	struct modem_param_info *modem;
 
 	switch (evt->type) {
-	case CLOUD_EVT_CONNECTED:
-	case CLOUD_EVT_CONNECTING:
-	case CLOUD_EVT_DISCONNECTED:
+	case NRF_CLOUD_EVT_TRANSPORT_CONNECTED:
+	case NRF_CLOUD_EVT_TRANSPORT_CONNECTING:
+	case NRF_CLOUD_EVT_TRANSPORT_DISCONNECTED:
 		connection_evt_handler(evt);
 		break;
-	case CLOUD_EVT_READY:
-		LOG_INF("CLOUD_EVT_READY");
+	case NRF_CLOUD_EVT_READY:
+		LOG_INF("NRF_CLOUD_EVT_READY");
 		ui_led_set_pattern(UI_CLOUD_CONNECTED, PWM_DEV_0);
 
 #if defined(CONFIG_BOOTLOADER_MCUBOOT) && !defined(CONFIG_NRF_CLOUD_FOTA)
@@ -678,30 +564,33 @@ void cloud_event_handler(const struct cloud_backend *const backend,
 		modem = query_modem_info();
 		set_shadow_modem(modem);
 		break;
-	case CLOUD_EVT_ERROR:
-		LOG_INF("CLOUD_EVT_ERROR");
+	case NRF_CLOUD_EVT_ERROR:
+		LOG_INF("NRF_CLOUD_EVT_ERROR");
 		break;
-	case CLOUD_EVT_DATA_SENT:
-		LOG_INF("CLOUD_EVT_DATA_SENT");
+	case NRF_CLOUD_EVT_RX_DATA:
+		LOG_INF("NRF_CLOUD_EVT_RX_DATA");
+		gateway_handler((const uint8_t *)&evt->data.ptr);
 		break;
-	case CLOUD_EVT_DATA_RECEIVED:
-		LOG_INF("CLOUD_EVT_DATA_RECEIVED");
-		gateway_handler(&evt->data.msg);
+	case NRF_CLOUD_EVT_USER_ASSOCIATION_REQUEST:
+		LOG_INF("NRF_CLOUD_EVT_USER_ASSOCIATION_REQUEST");
+		on_user_pairing_req();
 		break;
-	case CLOUD_EVT_PAIR_REQUEST:
-		LOG_INF("CLOUD_EVT_PAIR_REQUEST");
-		on_user_pairing_req(evt);
-		break;
-	case CLOUD_EVT_PAIR_DONE:
-		LOG_INF("CLOUD_EVT_PAIR_DONE");
+	case NRF_CLOUD_EVT_USER_ASSOCIATED:
+		LOG_INF("NRF_CLOUD_EVT_USER_ASSOCIATED");
 		on_pairing_done();
 		break;
-	case CLOUD_EVT_FOTA_ERROR:
-		LOG_INF("CLOUD_EVT_FOTA_ERROR");
+	case NRF_CLOUD_EVT_FOTA_START:
+		LOG_INF("NRF_CLOUD_EVT_FOTA_START");
 		break;
-	case CLOUD_EVT_FOTA_DONE:
-		LOG_INF("CLOUD_EVT_FOTA_DONE");
+	case NRF_CLOUD_EVT_FOTA_ERROR:
+		LOG_INF("NRF_CLOUD_EVT_FOTA_ERROR");
+		break;
+	case NRF_CLOUD_EVT_FOTA_DONE:
+		LOG_INF("NRF_CLOUD_EVT_FOTA_DONE");
 		fota_done_handler(evt);
+		break;
+	case NRF_CLOUD_EVT_PINGRESP:
+		LOG_INF("NRF_CLOUD_EVT_PINGRESP");
 		break;
 	default:
 		LOG_WRN("Unknown cloud event type: %d", evt->type);
@@ -729,7 +618,7 @@ struct modem_param_info * query_modem_info(void)
 			_daylight = atoi(&str[25]);
 			LOG_INF("Network date/time: %s "
 				"DST %d TZ %ld",
-				log_strdup(modem_param.network.date_time.value_string),
+				modem_param.network.date_time.value_string,
 				_daylight, _timezone);
 
 			struct tm tm;
@@ -761,10 +650,12 @@ struct modem_param_info * query_modem_info(void)
 		} else {
 			LOG_WRN("modem_info.network.date_time: empty");
 		}
-#endif
+#endif /* CONFIG_DATE_TIME */
 		return &modem_param;
 	}
-#endif
+#else
+	return NULL;
+#endif /* CONFIG_MODEM_INFO */
 }
 
 #ifdef CONFIG_DATE_TIME
@@ -790,7 +681,7 @@ static void date_time_event_handler(const struct date_time_evt *evt)
 	char time_str[30] = {0};
 
 	if (get_time_str(time_str, sizeof(time_str))) {
-		LOG_INF("Current UTC: %s", log_strdup(time_str));
+		LOG_INF("Current UTC: %s", time_str);
 	}
 }
 #endif
@@ -800,43 +691,38 @@ void control_cloud_connection(bool enable)
 	cloud_connection_enabled = enable;
 }
 
-void connection_evt_handler(const struct cloud_event *const evt)
+void connection_evt_handler(const struct nrf_cloud_evt *const evt)
 {
 	LOG_INF("*******************************");
-	if (evt->type == CLOUD_EVT_CONNECTING) {
+	if (evt->type == NRF_CLOUD_EVT_TRANSPORT_CONNECTING) {
 		cloud_connection_status = false;
-		LOG_INF("CLOUD_EVT_CONNECTING");
+		LOG_INF("NRF_CLOUD_EVT_TRANSPORT_CONNECTING");
 		ui_led_set_pattern(UI_CLOUD_CONNECTING, PWM_DEV_0);
 		k_work_cancel_delayable(&cloud_reboot_work);
-
-		if (evt->data.err != CLOUD_CONNECT_RES_SUCCESS) {
-			cloud_connect_error_handler(evt->data.err);
-		}
 		return;
-	} else if (evt->type == CLOUD_EVT_CONNECTED) {
+	} else if (evt->type == NRF_CLOUD_EVT_TRANSPORT_CONNECTED) {
 #ifdef CONFIG_DATE_TIME
 		date_time_update_async(date_time_event_handler);
 #endif
 		cloud_connection_status = true;
-		LOG_INF("CLOUD_EVT_CONNECTED");
+		LOG_INF("NRF_CLOUD_EVT_TRANSPORT_CONNECTED");
 		k_work_cancel_delayable(&cloud_reboot_work);
 		k_sem_take(&cloud_disconnected, K_NO_WAIT);
 		atomic_set(&cloud_connect_attempts, 0);
 
-		LOG_INF("Persistent Sessions = %u",
-			evt->data.persistent_session);
-	} else if (evt->type == CLOUD_EVT_DISCONNECTED) {
+		/* LOG_INF("Persistent Sessions = %u", evt->data.persistent_session); */
+	} else if (evt->type == NRF_CLOUD_EVT_TRANSPORT_DISCONNECTED) {
 		int32_t connect_wait_s = CONFIG_CLOUD_CONNECT_RETRY_DELAY;
 
 		cloud_connection_status = false;
-		LOG_INF("CLOUD_EVT_DISCONNECTED: %d", evt->data.err);
+		LOG_INF("NRF_CLOUD_EVT_TRANSPORT_DISCONNECTED: %d", evt->status);
 		ui_led_set_pattern(UI_LTE_CONNECTED, PWM_DEV_0);
 
-		switch (evt->data.err) {
-		case CLOUD_DISCONNECT_INVALID_REQUEST:
+		switch (evt->status) {
+		case NRF_CLOUD_DISCONNECT_INVALID_REQUEST:
 			LOG_INF("Cloud connection closed.");
 			break;
-		case CLOUD_DISCONNECT_USER_REQUEST:
+		case NRF_CLOUD_DISCONNECT_USER_REQUEST:
 			if (atomic_get(&cloud_association) ==
 			    CLOUD_ASSOCIATION_STATE_RECONNECT ||
 			    atomic_get(&cloud_association) ==
@@ -845,28 +731,19 @@ void connection_evt_handler(const struct cloud_event *const evt)
 				connect_wait_s = 10;
 			}
 			break;
-		case CLOUD_DISCONNECT_CLOSED_BY_REMOTE:
+		case NRF_CLOUD_DISCONNECT_CLOSED_BY_REMOTE:
 			LOG_INF("Disconnected by the cloud.");
 			if ((atomic_get(&cloud_connect_attempts) == 1) &&
 			    (atomic_get(&cloud_association) ==
 			     CLOUD_ASSOCIATION_STATE_INIT)) {
 				LOG_INF("This can occur during initial nRF Cloud provisioning.");
-#if defined(CONFIG_LWM2M_CARRIER)
-#if !defined(CONFIG_DEBUG) && defined(CONFIG_REBOOT)
-				/* Reconnect does not work with carrier library */
-				LOG_INF("Rebooting in 10 seconds...");
-				k_sleep(K_SECONDS(10));
-#endif
-				error_handler(ERROR_CLOUD, -EIO);
-				break;
-#endif
 				connect_wait_s = 10;
 			} else {
 				LOG_INF("This can occur if the device has the wrong nRF Cloud certificates");
 				LOG_INF("or if the device has been removed from nRF Cloud.");
 			}
 			break;
-		case CLOUD_DISCONNECT_MISC:
+		case NRF_CLOUD_DISCONNECT_MISC:
 			LOG_INF("CLOUD_DISCONNECT_MISC");
 		default:
 			break;
@@ -892,16 +769,21 @@ static void work_init(void)
 static void cloud_api_init(void)
 {
 	int ret;
-
-	cloud_backend = cloud_get_binding("NRF_CLOUD");
-	__ASSERT(cloud_backend != NULL, "nRF Cloud backend not found");
+#if defined(CONFIG_NRF_CLOUD_CLIENT_ID_SRC_RUNTIME)
+	char id[NRF_CLOUD_CLIENT_ID_MAX_LEN + 1];
+#else
+	char *id = NULL;
+#endif
+	struct nrf_cloud_init_param init_param = {
+		cloud_event_handler, id, NULL
+	};
 
 #if defined(CONFIG_NRF_CLOUD_CLIENT_ID_SRC_RUNTIME)
 	/* src runtime id must be provided pre-cloud init */
-	gw_psk_id_get(&cloud_backend->config->id, &cloud_backend->config->id_len);
+	gw_psk_id_get(id, NRF_CLOUD_CLIENT_ID_MAX_LEN);
 #endif
 
-	ret = cloud_init(cloud_backend, cloud_event_handler);
+	ret = nrf_cloud_init(&init_param);
 	if (ret) {
 		LOG_ERR("Cloud backend could not be initialized, error: %d",
 			ret);
@@ -914,7 +796,7 @@ static void cloud_api_init(void)
 		LOG_ERR("Device ID is unknown: %d", ret);
 		cloud_error_handler(ret);
 	} else {
-		LOG_INF("Device ID = %s", log_strdup(gateway_id));
+		LOG_INF("Device ID = %s", gateway_id);
 		LOG_INF("Endpoint = %s", CONFIG_NRF_CLOUD_HOST_NAME);
 	}
 
@@ -942,18 +824,12 @@ static int modem_configure(void)
 	LOG_INF("Connecting to LTE network.");
 	LOG_INF("This may take several minutes.");
 
-#if defined(CONFIG_LWM2M_CARRIER)
-	/* Wait for the LWM2M carrier library to configure the */
-	/* modem and set up the LTE connection. */
-	k_sem_take(&lte_connected, K_FOREVER);
-#else /* defined(CONFIG_LWM2M_CARRIER) */
 	int err = lte_lc_init_and_connect();
 	if (err) {
 		lte_connection_status = false;
 		LOG_ERR("LTE link could not be established.");
 		return err;
 	}
-#endif /* defined(CONFIG_LWM2M_CARRIER) */
 
 connected:
 	lte_connection_status = true;
@@ -1047,7 +923,7 @@ static void lte_handler(const struct lte_lc_evt *const evt)
 					"eDRX parameter update: eDRX: %0.2f, PTW: %0.2f",
 					evt->edrx_cfg.edrx, evt->edrx_cfg.ptw);
 		if ((len > 0) && (len < sizeof(log_buf))) {
-			LOG_INF("%s", log_strdup(log_buf));
+			LOG_INF("%s", log_buf);
 		}
 		break;
 	}
@@ -1184,11 +1060,7 @@ void main(void)
 		watchdog_init_and_start(&application_work_q);
 	}
 
-#if defined(CONFIG_LWM2M_CARRIER)
-	k_sem_take(&nrf_modem_initialized, K_FOREVER);
-#else
 	handle_nrf_modem_lib_init_ret();
-#endif
 	/* delay a bit to allow BLE logging to catch up before
 	 * connecting to cloud -- otherwise it can be hard to follow
 	 * what's happening when debugging
@@ -1213,11 +1085,4 @@ void main(void)
 			CONFIG_CLOUD_CONNECT_RETRY_DELAY);
 		k_sleep(K_SECONDS(CONFIG_CLOUD_CONNECT_RETRY_DELAY));
 	}
-
-#if defined(CONFIG_LWM2M_CARRIER)
-	LOG_INF("Waiting for LWM2M carrier to complete initialization...");
-	k_sem_take(&cloud_ready_to_connect, K_FOREVER);
-#endif
-
-	connect_to_cloud(0);
 }

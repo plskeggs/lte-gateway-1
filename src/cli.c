@@ -16,7 +16,6 @@
 #include <modem/modem_info.h>
 #include <nrf_modem_at.h>
 #include <modem/lte_lc.h>
-#include <net/cloud.h>
 #include <net/buf.h>
 #include <net/fota_download.h>
 #include <bluetooth/hci.h>
@@ -58,14 +57,15 @@ static char response_buf[1024];
 static void set_at_prompt(const struct shell *shell, bool at_mode);
 void peripheral_dfu_set_test_mode(bool test);
 
-char *rem_eol(const char *s)
+char *rem_eol(const char *s, char *d, int len)
 {
 	if (!s) {
 		return "";
 	}
 
-	char *x = log_strdup(s);
-	char *p = x;
+	char *p = d;
+
+	strncpy(d, s, len);
 
 	while (*p) {
 		if ((*p == '\r') || (*p == '\n')) {
@@ -74,7 +74,7 @@ char *rem_eol(const char *s)
 		}
 		p++;
 	}
-	return x;
+	return d;
 }
 
 void print_fw_info(const struct shell *shell, bool verbose)
@@ -106,27 +106,9 @@ void print_heap(bool detailed)
 {
 	extern struct k_heap _system_heap;
 	struct sys_heap *s_heap = &_system_heap.heap;
-	extern struct k_heap library_heap;
-	struct sys_heap *ls_heap = &library_heap.heap;
 
 	printk("System Heap:\n");
 	sys_heap_print_info(s_heap, detailed);
-	printk("Library Heap:\n");
-	sys_heap_print_info(ls_heap, detailed);
-}
-
-void print_log_strdup(const struct shell *shell)
-{
-	extern struct k_mem_slab log_strdup_pool;
-	uint32_t max_used;
-	uint32_t num_used;
-	uint32_t num_free;
-
-	max_used = k_mem_slab_max_used_get(&log_strdup_pool);
-	num_used = k_mem_slab_num_used_get(&log_strdup_pool);
-	num_free = k_mem_slab_num_free_get(&log_strdup_pool);
-	shell_print(shell, "log_strdup: \tFree:%u, Used:%u, Max Used:%u",
-		    num_free, num_used, max_used);
 }
 
 void print_modem_info(const struct shell *shell)
@@ -143,10 +125,11 @@ void print_modem_info(const struct shell *shell)
 		struct device_param *dev = &modem_param.device;
 		struct network_param *net = &modem_param.network;
 		struct sim_param *sim = &modem_param.sim;
+		char buf[128];
 
 		if (dev->modem_fw.type == MODEM_INFO_FW_VERSION) {
 			shell_print(shell, "Modem fw: \t%s",
-			  rem_eol(dev->modem_fw.value_string));
+			  rem_eol(dev->modem_fw.value_string, buf, sizeof(buf)));
 		} else {
 			shell_print(shell, "Modem fw type: \t%u val %u",
 				dev->modem_fw.type,
@@ -158,14 +141,14 @@ void print_modem_info(const struct shell *shell)
 		}
 		if (dev->imei.type == MODEM_INFO_IMEI) {
 			shell_print(shell, "IMEI: \t\t%s",
-			      rem_eol(dev->imei.value_string));
+			      rem_eol(dev->imei.value_string, buf, sizeof(buf)));
 		}
 		shell_print(shell, "Board: \t\t%s",
-			    rem_eol(dev->board));
+			    rem_eol(dev->board, buf, sizeof(buf)));
 		shell_print(shell, "App Name: \t%s",
-			    rem_eol(dev->app_name));
+			    rem_eol(dev->app_name, buf, sizeof(buf)));
 		shell_print(shell, "App Ver: \t%s",
-			    rem_eol(dev->app_version));
+			    rem_eol(dev->app_version, buf, sizeof(buf)));
 
 		if (sim->uicc.type == MODEM_INFO_UICC) {
 			shell_print(shell, "UICC: \t\t%u",
@@ -173,11 +156,11 @@ void print_modem_info(const struct shell *shell)
 		}
 		if (sim->iccid.type == MODEM_INFO_ICCID) {
 			shell_print(shell, "ICCID: \t\t%s",
-				    rem_eol(sim->iccid.value_string));
+				    rem_eol(sim->iccid.value_string, buf, sizeof(buf)));
 		}
 		if (sim->imsi.type == MODEM_INFO_IMSI) {
 			shell_print(shell, "IMSI: \t\t%s",
-				    rem_eol(sim->imsi.value_string));
+				    rem_eol(sim->imsi.value_string, buf, sizeof(buf)));
 		}
 
 		if (net->current_band.type ==
@@ -188,17 +171,17 @@ void print_modem_info(const struct shell *shell)
 		if (net->sup_band.type ==
 		    MODEM_INFO_SUP_BAND) {
 			shell_print(shell, "Sup band: \t%s",
-				    rem_eol(net->sup_band.value_string));
+				    rem_eol(net->sup_band.value_string, buf, sizeof(buf)));
 		}
 		if (net->area_code.type ==
 		    MODEM_INFO_AREA_CODE) {
 			shell_print(shell, "Area code: \t%s",
-				 rem_eol(net->area_code.value_string));
+				 rem_eol(net->area_code.value_string, buf, sizeof(buf)));
 		}
 		if (net->current_operator.type ==
 		    MODEM_INFO_OPERATOR) {
 			shell_print(shell, "Operator: \t%s",
-			     rem_eol(net->current_operator.value_string));
+			     rem_eol(net->current_operator.value_string, buf, sizeof(buf)));
 		}
 		if (net->mcc.type ==
 		    MODEM_INFO_MCC) {
@@ -213,7 +196,7 @@ void print_modem_info(const struct shell *shell)
 		if (net->ip_address.type ==
 		    MODEM_INFO_IP_ADDRESS) {
 			shell_print(shell, "IP address: \t%s",
-				   rem_eol(net->ip_address.value_string));
+				   rem_eol(net->ip_address.value_string, buf, sizeof(buf)));
 		}
 		if (net->ue_mode.type ==
 		    MODEM_INFO_UE_MODE) {
@@ -223,7 +206,7 @@ void print_modem_info(const struct shell *shell)
 		if (net->apn.type ==
 		    MODEM_INFO_APN) {
 			shell_print(shell, "Access point: \t%s",
-				    rem_eol(net->apn.value_string));
+				    rem_eol(net->apn.value_string, buf, sizeof(buf)));
 		}
 		if (net->lte_mode.value == 1) {
 			shell_print(shell, "Mode: \t\tLTE-M");
@@ -241,7 +224,7 @@ void print_modem_info(const struct shell *shell)
 
 		shell_print(shell, "Net date/time: \t%s "
 			"DST %d TZ %ld",
-			log_strdup(str), _daylight, _timezone);
+			str, _daylight, _timezone);
 		clock_gettime(CLOCK_REALTIME, &now);
 		tm = localtime(&now.tv_sec);
 		if (tm == NULL) {
@@ -258,7 +241,7 @@ void print_modem_info(const struct shell *shell)
 		char time_str[30] = {0};
 
 		if (get_time_str(time_str, sizeof(time_str))) {
-			shell_print(shell, "Current UTC: \t%s", log_strdup(time_str));
+			shell_print(shell, "Current UTC: \t%s", time_str);
 		}
 #endif
 	}
@@ -887,7 +870,6 @@ static int cmd_info_gateway(const struct shell *shell, size_t argc, char **argv)
 
 	print_fw_info(shell, true);
 	print_heap(detailed);
-	print_log_strdup(shell);
 	return 0;
 }
 

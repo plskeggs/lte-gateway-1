@@ -4,26 +4,36 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <drivers/gpio.h>
-#include <drivers/uart.h>
-#include <device.h>
+#include <zephyr/drivers/gpio.h>
+#include <zephyr/drivers/uart.h>
+#include <zephyr/device.h>
 
-#define RESET_PIN CONFIG_BOARD_NRF52840_GPIO_RESET_PIN
+#define RESET_NODE DT_NODELABEL(nrf52840_reset)
+
+#if DT_NODE_HAS_STATUS(RESET_NODE, okay)
+
+#define RESET_GPIO_CTRL  DT_GPIO_CTLR(RESET_NODE, gpios)
+#define RESET_GPIO_PIN   DT_GPIO_PIN(RESET_NODE, gpios)
+#define RESET_GPIO_FLAGS DT_GPIO_FLAGS(RESET_NODE, gpios)
+
 #define BOOT_PIN CONFIG_BOARD_NRF52840_GPIO_BOOT_SELECT_PIN
 #define WAIT_BOOT_INTERVAL_MS 50
 
 static int nrf52840_reset_assert(bool boot_select)
 {
 	int err;
-	const struct device *port;
+	const struct device *port = DEVICE_DT_GET(RESET_GPIO_CTRL);
 
-	port = device_get_binding(DT_LABEL(DT_NODELABEL(gpio0)));
 	if (!port) {
 		return -EIO;
 	}
 
+	if (!device_is_ready(port)) {
+		return -EIO;
+	}
+
 	/* Configure pin as output and initialize it to low. */
-	err = gpio_pin_configure(port, RESET_PIN, GPIO_OUTPUT_LOW);
+	err = gpio_pin_configure(port, RESET_GPIO_PIN, GPIO_OUTPUT_LOW);
 	if (err) {
 		return err;
 	}
@@ -45,7 +55,7 @@ static int nrf52840_reset_assert(bool boot_select)
 		return err;
 	}
 
-	err = gpio_pin_set(port, RESET_PIN, 1);
+	err = gpio_pin_set(port, RESET_GPIO_PIN, 1);
 	return err;
 }
 
@@ -168,4 +178,5 @@ int bt_hci_transport_setup(struct device *h4)
 
 	return 0;
 }
+#endif /* DT_NODE_HAS_STATUS(RESET_NODE, okay) */
 

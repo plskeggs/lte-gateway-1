@@ -10,7 +10,6 @@
 #include <modem/lte_lc.h>
 #include <nrf9160.h>
 #include <hal/nrf_gpio.h>
-#include <net/cloud.h>
 #if defined(CONFIG_NRF_MODEM_LIB)
 #include <nrf_socket.h>
 #endif
@@ -87,16 +86,16 @@ void cloud_data_process(int unused1, int unused2, int unused3)
 #if defined(QUEUE_CHAR_READS)
 			else if (cloud_data->read) {
 				LOG_DBG("Dequeued gatt_read request %s, %s, %u",
-					log_strdup(cloud_data->addr),
-					log_strdup(cloud_data->uuid),
+					cloud_data->addr,
+					cloud_data->uuid,
 					cloud_data->ccc);
 				ret = gatt_read(cloud_data->addr,
 						cloud_data->uuid,
 						cloud_data->ccc);
 				if (ret) {
 					LOG_ERR("Error on gatt_read(%s, %s, %u): %d",
-						log_strdup(cloud_data->addr),
-						log_strdup(cloud_data->uuid),
+						cloud_data->addr,
+						cloud_data->uuid,
 						cloud_data->ccc,
 						ret);
 				}
@@ -110,8 +109,8 @@ void cloud_data_process(int unused1, int unused2, int unused3)
 						 cloud_data->data_len, NULL);
 				if (ret) {
 					LOG_ERR("Error on gatt_write(%s, %s): %d",
-						log_strdup(cloud_data->addr),
-						log_strdup(cloud_data->uuid),
+						cloud_data->addr,
+						cloud_data->uuid,
 						ret);
 				}
 			}
@@ -137,7 +136,7 @@ static bool compare(const char *s1, const char *s2)
 	return !strncmp(s1, s2, strlen(s2));
 }
 
-int gateway_handler(const struct cloud_msg *gw_data)
+int gateway_handler(const uint8_t *gw_data)
 {
 	int ret = 0;
 	cJSON *root_obj;
@@ -157,11 +156,10 @@ int gateway_handler(const struct cloud_msg *gw_data)
 	cJSON *value_arr;
 	uint8_t value_len = 0;
 
-	root_obj = cJSON_Parse(gw_data->buf);
+	root_obj = cJSON_Parse(gw_data);
 
 	if (root_obj == NULL) {
-		LOG_ERR("cJSON_Parse failed: %s",
-			log_strdup((char *)gw_data->buf));
+		LOG_ERR("cJSON_Parse failed: %s", gw_data);
 		return -ENOENT;
 	}
 
@@ -205,7 +203,7 @@ int gateway_handler(const struct cloud_msg *gw_data)
 					       "characteristicUUID");
 
 		LOG_INF("Got device_characteristic_value_read: %s",
-			log_strdup(ble_address->valuestring));
+			ble_address->valuestring);
 		if ((ble_address != NULL) && (chrc_uuid != NULL)) {
 #if defined(QUEUE_CHAR_READS)
 			struct cloud_data_t cloud_data = {
@@ -233,15 +231,15 @@ int gateway_handler(const struct cloud_msg *gw_data)
 			memcpy(mem_ptr, &cloud_data, size);
 			k_fifo_put(&cloud_data_fifo, mem_ptr);
 			LOG_INF("Queued device_characteristic_value_read %s, %s, 0",
-				log_strdup(cloud_data.addr),
-				log_strdup(cloud_data.uuid));
+				cloud_data.addr,
+				cloud_data.uuid);
 #else
 			ret = gatt_read(ble_address->valuestring,
 					chrc_uuid->valuestring);
 			if (ret) {
 				LOG_ERR("Error on gatt_read(%s, %s, 0): %d",
-					log_strdup(ble_address->valuestring),
-					log_strdup(chrc_uuid->valuestring),
+					ble_address->valuestring,
+					chrc_uuid->valuestring,
 					ret);
 			}
 #endif
@@ -256,7 +254,7 @@ int gateway_handler(const struct cloud_msg *gw_data)
 					       "characteristicUUID");
 
 		LOG_INF("Got device_descriptor_value_read: %s",
-			log_strdup(ble_address->valuestring));
+			ble_address->valuestring);
 		if ((ble_address != NULL) && (chrc_uuid != NULL)) {
 #if defined(QUEUE_CHAR_READS)
 			struct cloud_data_t cloud_data = {
@@ -284,15 +282,15 @@ int gateway_handler(const struct cloud_msg *gw_data)
 			memcpy(mem_ptr, &cloud_data, size);
 			k_fifo_put(&cloud_data_fifo, mem_ptr);
 			LOG_INF("Queued device_descriptor_value_read %s, %s",
-				log_strdup(cloud_data.addr),
-				log_strdup(cloud_data.uuid));
+				cloud_data.addr,
+				cloud_data.uuid);
 #else
 			ret = gatt_read(ble_address->valuestring,
 					chrc_uuid->valuestring, true);
 			if (ret) {
 				LOG_ERR("Error on gatt_read(%s, %s, 1): %d",
-					log_strdup(ble_address->valuestring),
-					log_strdup(chrc_uuid->valuestring),
+					ble_address->valuestring,
+					chrc_uuid->valuestring,
 					ret);
 			}
 #endif
@@ -396,8 +394,8 @@ int gateway_handler(const struct cloud_msg *gw_data)
 					 value_buf, value_len, NULL);
 			if (ret) {
 				LOG_ERR("Error on gatt_write(%s, %s): %d",
-					log_strdup(ble_address->valuestring),
-					log_strdup(chrc_uuid->valuestring),
+					ble_address->valuestring,
+					chrc_uuid->valuestring,
 					ret);
 			}
 #endif
@@ -476,7 +474,7 @@ int gw_psk_id_get(char **id, size_t *id_len)
 		char *ptr = psk_buf;
 		const char *delimiters = ",";
 
-		LOG_DBG("ID is inside this: %s", log_strdup(psk_buf));
+		LOG_DBG("ID is inside this: %s", psk_buf);
 		for (i = 0; i < 3; i++) {
 			ofs = strcspn(ptr, delimiters) + 1;
 			ptr += ofs;
@@ -538,7 +536,6 @@ int gw_shadow_publish(const struct nrf_cloud_data *output)
 
 void device_shutdown(bool reboot)
 {
-	struct cloud_backend *backend;
 	int err;
 
 	LOG_PANIC();
@@ -553,10 +550,9 @@ void device_shutdown(bool reboot)
 	ui_led_set_pattern(UI_BLE_OFF, PWM_DEV_1);
 
 	LOG_INF("Disconnect from cloud...");
-	backend = cloud_get_binding("NRF_CLOUD");
-	err = cloud_disconnect(backend);
+	err = nrf_cloud_disconnect();
 	if (err) {
-		LOG_ERR("Error closing cloud backend: %d",
+		LOG_ERR("Error closing cloud: %d",
 			err);
 	}
 

@@ -128,7 +128,7 @@ char *get_time_str(char *dst, size_t len)
 		if (time) {
 			/* 2020-02-19T18:38:50.363Z */
 			strftime(dst, len, "%Y-%m-%dT%H:%M:%S.000Z", time);
-			LOG_DBG("Date/time %s", log_strdup(dst));
+			LOG_DBG("Date/time %s", dst);
 		} else {
 			LOG_WRN("Time not valid");
 			dst = NULL;
@@ -148,7 +148,7 @@ char *get_time_str(char *dst, size_t len)
 		tm = *(gmtime(&t));
 		/* 2020-02-19T18:38:50.363Z */
 		strftime(dst, len, "%Y-%m-%dT%H:%M:%S.000Z", &tm);
-		LOG_DBG("Date/time %s", log_strdup(dst));
+		LOG_DBG("Date/time %s", dst);
 	}
 #endif
 	return dst;
@@ -189,7 +189,7 @@ int device_error_encode(char *ble_address, char *error_msg,
 
 	CJPRINT(root_obj, (char *)msg->data.ptr, msg->data_max_len, 0);
 	msg->data.len = strlen((char *)msg->data.ptr);
-	LOG_DBG("Device JSON: %s", log_strdup((char *)msg->data.ptr));
+	LOG_DBG("Device JSON: %s", (char *)msg->data.ptr);
 	ret = 0;
 
 cleanup:
@@ -225,7 +225,7 @@ int device_found_encode(uint8_t num_devices_found, struct gw_msg *msg)
 
 	for (int i = 0; i < num_devices_found; i++) {
 		LOG_DBG("Adding device %s RSSI: %d\n",
-			log_strdup(ble_scanned_devices[i].addr),
+			ble_scanned_devices[i].addr,
 			ble_scanned_devices[i].rssi);
 
 		/* TODO: Update for beacons */
@@ -250,7 +250,7 @@ int device_found_encode(uint8_t num_devices_found, struct gw_msg *msg)
 
 	CJPRINT(root_obj, (char *)msg->data.ptr, msg->data_max_len, 0);
 	msg->data.len = strlen((char *)msg->data.ptr);
-	LOG_DBG("Device JSON: %s", log_strdup((char *)msg->data.ptr));
+	LOG_DBG("Device JSON: %s", (char *)msg->data.ptr);
 	ret = 0;
 
 cleanup:
@@ -297,7 +297,7 @@ int device_connect_result_encode(char *ble_address, bool conn_status,
 
 	CJPRINT(root_obj, (char *)msg->data.ptr, msg->data_max_len, 0);
 	msg->data.len = strlen((char *)msg->data.ptr);
-	LOG_DBG("Device JSON: %s", log_strdup((char *)msg->data.ptr));
+	LOG_DBG("Device JSON: %s", (char *)msg->data.ptr);
 	ret = 0;
 
 cleanup:
@@ -343,7 +343,7 @@ int device_disconnect_result_encode(char *ble_address, bool conn_status,
 
 	CJPRINT(root_obj, (char *)msg->data.ptr, msg->data_max_len, 0);
 	msg->data.len = strlen((char *)msg->data.ptr);
-	LOG_DBG("Device JSON: %s", log_strdup((char *)msg->data.ptr));
+	LOG_DBG("Device JSON: %s", (char *)msg->data.ptr);
 	ret = 0;
 
 cleanup:
@@ -400,7 +400,7 @@ int device_value_changed_encode(char *ble_address, char *uuid, char *path,
 
 	CJPRINT(root_obj, (char *)msg->data.ptr, msg->data_max_len, 0);
 	msg->data.len = strlen((char *)msg->data.ptr);
-	LOG_DBG("Device JSON: %s", log_strdup((char *)msg->data.ptr));
+	LOG_DBG("Device JSON: %s", (char *)msg->data.ptr);
 	ret = 0;
 
 cleanup:
@@ -458,7 +458,7 @@ int device_value_write_result_encode(char *ble_address, char *uuid, char *path,
 
 	CJPRINT(root_obj, (char *)msg->data.ptr, msg->data_max_len, 0);
 	msg->data.len = strlen((char *)msg->data.ptr);
-	LOG_DBG("Device JSON: %s", log_strdup((char *)msg->data.ptr));
+	LOG_DBG("Device JSON: %s", (char *)msg->data.ptr);
 	ret = 0;
 
 cleanup:
@@ -520,7 +520,7 @@ int device_descriptor_value_encode(char *ble_address, char *uuid,
 
 	CJPRINT(root_obj, (char *)msg->data.ptr, msg->data_max_len, 0);
 	msg->data.len = strlen((char *)msg->data.ptr);
-	LOG_DBG("Device JSON: %s", log_strdup((char *)msg->data.ptr));
+	LOG_DBG("Device JSON: %s", (char *)msg->data.ptr);
 	ret = 0;
 
 cleanup:
@@ -578,7 +578,7 @@ int device_chrc_read_encode(char *ble_address, char *uuid, char *path,
 
 	CJPRINT(root_obj, (char *)msg->data.ptr, msg->data_max_len, 0);
 	msg->data.len = strlen((char *)msg->data.ptr);
-	LOG_DBG("Device JSON: %s", log_strdup((char *)msg->data.ptr));
+	LOG_DBG("Device JSON: %s", (char *)msg->data.ptr);
 	ret = 0;
 
 cleanup:
@@ -806,7 +806,7 @@ int gateway_desired_list_encode(struct desired_conn *desired, int num_desired,
 
 	CJPRINT(root_obj, (char *)msg->data.ptr, msg->data_max_len, 0);
 	msg->data.len = strlen((char *)msg->data.ptr);
-	LOG_DBG("JSON: %s", log_strdup((char *)msg->data.ptr));
+	LOG_DBG("JSON: %s", (char *)msg->data.ptr);
 
 	ret = 0;
 
@@ -911,8 +911,8 @@ static int svc_attr_encode(char *uuid, char *path,
 
 	/* Print services and add to wrapper */
 	CJPRINT(services, service_buffer, MAX_SERVICE_BUF_SIZE, 0);
-	LOG_DBG("JSON: %s", log_strdup(service_buffer));
-	LOG_DBG("Encoding service %s", log_strdup(uuid));
+	LOG_DBG("JSON: %s", service_buffer);
+	LOG_DBG("Encoding service %s", uuid);
 	ret = device_discover_add_service(service_buffer, msg);
 
 cleanup:
@@ -979,7 +979,7 @@ static int chrc_attr_encode(char *uuid, char *path, uint8_t properties,
 
 	/* Print parent_chrhc and add to service */
 	CJPRINT(parent_chrc, service_buffer, MAX_SERVICE_BUF_SIZE, 0);
-	LOG_DBG("JSON: %s", log_strdup(service_buffer));
+	LOG_DBG("JSON: %s", service_buffer);
 	ret = device_discover_add_chrc(service_buffer, msg);
 
 cleanup:
@@ -1038,18 +1038,18 @@ static int attr_encode(struct uuid_handle_pair *uuid_handle,
 	bt_to_upper(path, strlen(path));
 
 	if (uuid_handle->attr_type ==  BT_ATTR_SERVICE) {
-		LOG_INF("Encoding Service : UUID: %s", log_strdup(uuid_str));
+		LOG_INF("Encoding Service : UUID: %s", uuid_str);
 		ret = svc_attr_encode(uuid_str, path, ble_conn_ptr, msg);
 
 	} else if (uuid_handle->attr_type == BT_ATTR_CHRC) {
 		LOG_DBG("Encoding Characteristic : UUID: %s  PATH: %s",
-			log_strdup(uuid_str), log_strdup(path));
+			uuid_str, path);
 		ret = chrc_attr_encode(uuid_str, path, uuid_handle->properties,
 				       ble_conn_ptr, msg);
 
 	} else if (uuid_handle->attr_type == BT_ATTR_CCC) {
 		LOG_DBG("Encoding CCC : UUID: %s  PATH: %s",
-			log_strdup(uuid_str), log_strdup(path));
+			uuid_str, path);
 		ret = ccc_attr_encode(uuid_str, path, ble_conn_ptr, msg,
 				      other_handle ?
 				      other_handle->sub_enabled : 0);
@@ -1255,7 +1255,7 @@ static int gateway_state_handler(void *root_obj)
 			/* new device found in cloud's array */
 			if (!found) {
 				LOG_INF("New device added by cloud: %s",
-					log_strdup(addr));
+					addr);
 				changed = true;
 				break;
 			}
@@ -1286,7 +1286,7 @@ static int gateway_state_handler(void *root_obj)
 		/* device removed from cloud's array, and it wasn't manually added */
 		if (!found && !cons[i].manual) {
 			LOG_INF("Device removed by cloud: %s",
-				log_strdup(cons[i].addr));
+				cons[i].addr);
 			changed = true;
 			break;
 		}
@@ -1305,11 +1305,11 @@ static int gateway_state_handler(void *root_obj)
 		addr = get_addr_from_des_conn_array(desired_connections_obj, i);
 
 		if (addr != NULL) {
-			LOG_DBG("Desired BLE address: %s", log_strdup(addr));
+			LOG_DBG("Desired BLE address: %s", addr);
 
 			if (!ble_conn_mgr_enabled(addr)) {
 				LOG_INF("Skipping disabled device: %s",
-					log_strdup(addr));
+					addr);
 				continue;
 			}
 			if (ble_conn_mgr_add_conn(addr)) {
