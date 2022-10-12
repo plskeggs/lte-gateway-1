@@ -17,7 +17,9 @@
 #include <nrf_modem_at.h>
 #include <modem/lte_lc.h>
 #include <net/buf.h>
+#if defined(CONFIG_NRF_CLOUD_FOTA)
 #include <net/fota_download.h>
+#endif
 #include <bluetooth/hci.h>
 #include <bluetooth/hci_vs.h>
 #include <bluetooth/gatt.h>
@@ -1290,6 +1292,7 @@ fota firmware.nrfcloud.com 3c7003c6-45a0-4a74-9023-1e006ceeb835/APP*30f6ce17*1.4
 */
 static int cmd_fota(const struct shell *shell, size_t argc, char **argv)
 {
+#if defined(CONFIG_NRF_CLOUD_FOTA)
 	if (argc < 3) {
 		return -EINVAL;
 	}
@@ -1318,6 +1321,10 @@ static int cmd_fota(const struct shell *shell, size_t argc, char **argv)
 		shell_error(shell, "Error %d starting download", err);
 	}
 	return 0;
+#else
+	shell_error(shell, "FOTA support not enabled in this build.");
+	return 0;
+#endif
 }
 
 /*

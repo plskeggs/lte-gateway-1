@@ -78,8 +78,10 @@ static void process_connection(int i)
 		err = bt_addr_from_str(connected_ble_devices[i].addr,
 				       &ble_id);
 		if (!err) {
+#if defined(CONFIG_GATEWAY_BLE_FOTA)
 			LOG_INF("Checking for BLE update...");
 			nrf_cloud_fota_ble_update_check(&ble_id);
+#endif
 		}
 	}
 }
