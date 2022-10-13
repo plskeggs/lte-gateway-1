@@ -439,17 +439,17 @@ int gw_psk_id_get(char **id, size_t *id_len)
 	int ret = 0;
 	int err;
 
-	at_socket_fd = nrf_socket(NRF_AF_LTE, NRF_SOCK_DGRAM, NRF_PROTO_AT);
+	at_socket_fd = nrf_socket(NRF_AF_INET, NRF_SOCK_DGRAM, NRF_IPPROTO_TCP);
 	if (at_socket_fd < 0) {
 		return -EIO;
 	}
 
-	bytes_written = nrf_write(at_socket_fd, GET_PSK_ID, GET_PSK_ID_LEN);
+	bytes_written = nrf_send(at_socket_fd, GET_PSK_ID, GET_PSK_ID_LEN, 0);
 	if (bytes_written != GET_PSK_ID_LEN) {
 		ret = -EIO;
 		goto cleanup;
 	}
-	bytes_read = nrf_read(at_socket_fd, psk_buf, AT_CMNG_READ_LEN);
+	bytes_read = nrf_recv(at_socket_fd, psk_buf, AT_CMNG_READ_LEN, 0);
 	if (bytes_read != AT_CMNG_READ_LEN) {
 		ret = -EIO;
 		goto cleanup;

@@ -9,8 +9,8 @@ manifest:
   projects:
     - name: sdk-nrf
       path: nrf
-      remote: nordic
-      revision: main
+      remote: origin
+      revision: feature-fix-ble-fota
       import: true
   self:
     path: lte-gateway

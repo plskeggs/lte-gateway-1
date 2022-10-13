@@ -770,7 +770,8 @@ static void cloud_api_init(void)
 {
 	int ret;
 #if defined(CONFIG_NRF_CLOUD_CLIENT_ID_SRC_RUNTIME)
-	char id[NRF_CLOUD_CLIENT_ID_MAX_LEN + 1];
+	char *id;
+	size_t id_len = NRF_CLOUD_CLIENT_ID_MAX_LEN;
 #else
 	char *id = NULL;
 #endif
@@ -780,7 +781,7 @@ static void cloud_api_init(void)
 
 #if defined(CONFIG_NRF_CLOUD_CLIENT_ID_SRC_RUNTIME)
 	/* src runtime id must be provided pre-cloud init */
-	gw_psk_id_get(id, NRF_CLOUD_CLIENT_ID_MAX_LEN);
+	gw_psk_id_get(&id, &id_len);
 #endif
 
 	ret = nrf_cloud_init(&init_param);
