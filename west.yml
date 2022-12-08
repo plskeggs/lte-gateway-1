@@ -11,6 +11,8 @@ manifest:
       path: nrf
       remote: origin
       revision: feature-fix-ble-fota
+      #remote: nordic
+      #revision: pull/8960/head
       import: true
   self:
     path: lte-gateway

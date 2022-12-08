@@ -1,12 +1,13 @@
-#include <zephyr.h>
+#include <zephyr/kernel.h>
 #include <stdio.h>
-#include <net/mqtt.h>
-#include <net/socket.h>
-#include <bluetooth/gatt.h>
-#include <sys/reboot.h>
+#include <zephyr/net/mqtt.h>
+#include <zephyr/net/socket.h>
+#include <zephyr/bluetooth/bluetooth.h>
+#include <zephyr/bluetooth/gatt.h>
+#include <zephyr/sys/reboot.h>
 #include <nrf_modem.h>
-#include <logging/log.h>
-#include <logging/log_ctrl.h>
+#include <zephyr/logging/log.h>
+#include <zephyr/logging/log_ctrl.h>
 #include <modem/lte_lc.h>
 #include <nrf9160.h>
 #include <hal/nrf_gpio.h>
@@ -23,7 +24,6 @@
 #include "cJSON.h"
 #include "cJSON_os.h"
 #include "ble.h"
-#include "bluetooth/bluetooth.h"
 #include "ble_codec.h"
 #include "ble_conn_mgr.h"
 

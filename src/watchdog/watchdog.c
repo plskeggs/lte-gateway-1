@@ -4,11 +4,11 @@
  * SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
  */
 
-#include <zephyr.h>
-#include <device.h>
-#include <drivers/watchdog.h>
+#include <zephyr/kernel.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/watchdog.h>
 
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(watchdog, 3);
 
 #define WDT_FEED_WORKER_DELAY_MS \

@@ -1,9 +1,9 @@
-#include <zephyr.h>
+#include <zephyr/kernel.h>
 #include <stdio.h>
 #include <string.h>
-#include <bluetooth/uuid.h>
-#include <bluetooth/gatt.h>
-#include <settings/settings.h>
+#include <zephyr/bluetooth/uuid.h>
+#include <zephyr/bluetooth/gatt.h>
+#include <zephyr/settings/settings.h>
 #include <nrf_cloud_fota.h>
 
 #include "gateway.h"
@@ -12,7 +12,7 @@
 #include "cJSON.h"
 #include "ble.h"
 
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(ble_conn_mgr, CONFIG_LOG_DEFAULT_LEVEL);
 
 static int num_connected;

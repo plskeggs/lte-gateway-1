@@ -1,12 +1,12 @@
-#include <zephyr.h>
+#include <zephyr/kernel.h>
 #include <stdio.h>
 #include <string.h>
 #undef __XSI_VISIBLE
 #define __XSI_VISIBLE 1
 #include <time.h>
-#include <posix/time.h>
-#include <bluetooth/uuid.h>
-#include <bluetooth/gatt.h>
+#include <zephyr/posix/time.h>
+#include <zephyr/bluetooth/uuid.h>
+#include <zephyr/bluetooth/gatt.h>
 #if defined(CONFIG_NRF_MODEM_LIB)
 #include <modem/modem_info.h>
 #endif /* CONFIG_NRF_MODEM_LIB */
@@ -26,7 +26,7 @@
 
 #define MAX_SERVICE_BUF_SIZE 300
 
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(ble_codec, CONFIG_NRF_CLOUD_GATEWAY_LOG_LEVEL);
 
 extern struct ble_scanned_dev ble_scanned_devices[MAX_SCAN_RESULTS];

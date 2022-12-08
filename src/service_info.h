@@ -7,7 +7,7 @@
 #ifndef SERVICE_INFO_H__
 #define SERVICE_INFO_H__
 
-#include <zephyr.h>
+#include <zephyr/kernel.h>
 #include <cJSON.h>
 
 /**

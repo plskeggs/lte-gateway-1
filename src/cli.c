@@ -1,30 +1,30 @@
-#include <zephyr.h>
-#include <sys/printk.h>
-#include <shell/shell.h>
-#include <shell/shell_uart.h>
-#include <shell/shell_history.h>
-#include <sys/reboot.h>
+#include <zephyr/kernel.h>
+#include <zephyr/sys/printk.h>
+#include <zephyr/shell/shell.h>
+#include <zephyr/shell/shell_uart.h>
+#include <zephyr/shell/shell_history.h>
+#include <zephyr/sys/reboot.h>
 #include <version.h>
-#include <logging/log.h>
-#include <logging/log_ctrl.h>
+#include <zephyr/logging/log.h>
+#include <zephyr/logging/log_ctrl.h>
 #include <stdlib.h>
 #include <fw_info.h>
 #undef __XSI_VISIBLE
 #define __XSI_VISIBLE 1
 #include <time.h>
-#include <posix/time.h>
+#include <zephyr/posix/time.h>
 #include <modem/modem_info.h>
 #include <nrf_modem_at.h>
 #include <modem/lte_lc.h>
-#include <net/buf.h>
+#include <zephyr/net/buf.h>
 #if defined(CONFIG_NRF_CLOUD_FOTA)
 #include <net/fota_download.h>
 #endif
-#include <bluetooth/hci.h>
-#include <bluetooth/hci_vs.h>
-#include <bluetooth/gatt.h>
-#include <sys/byteorder.h>
-#include <sw_isr_table.h>
+#include <zephyr/bluetooth/hci.h>
+#include <zephyr/bluetooth/hci_vs.h>
+#include <zephyr/bluetooth/gatt.h>
+#include <zephyr/sys/byteorder.h>
+#include <zephyr/sw_isr_table.h>
 #include <modem/lte_lc.h>
 
 #include "config.h"

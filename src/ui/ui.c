@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
  */
 
-#include <zephyr.h>
-#include <logging/log.h>
-#include <logging/log_ctrl.h>
+#include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
+#include <zephyr/logging/log_ctrl.h>
 #include <nrf9160.h>
 #include <hal/nrf_gpio.h>
 

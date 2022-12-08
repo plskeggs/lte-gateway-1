@@ -1,10 +1,10 @@
-#include <zephyr.h>
+#include <zephyr/kernel.h>
 #include <stdio.h>
 #include <string.h>
 #include <malloc.h>
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 #include <net/fota_download.h>
-#include <sys/crc.h>
+#include <zephyr/sys/crc.h>
 #include <cJSON.h>
 
 #include "nrf_cloud_fota.h"

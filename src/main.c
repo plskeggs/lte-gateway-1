@@ -4,35 +4,35 @@
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
 
-#include <zephyr.h>
-#include <kernel_structs.h>
+#include <zephyr/kernel.h>
+#include <zephyr/kernel_structs.h>
 #include <stdio.h>
 #include <string.h>
-#include <device.h>
-#include <drivers/uart.h>
-#include <drivers/sensor.h>
-#include <console/console.h>
-#include <sys/reboot.h>
-#include <logging/log_ctrl.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/uart.h>
+#include <zephyr/drivers/sensor.h>
+#include <zephyr/console/console.h>
+#include <zephyr/sys/reboot.h>
+#include <zephyr/logging/log_ctrl.h>
 #if defined(CONFIG_NRF_MODEM_LIB)
 #include <modem/nrf_modem_lib.h>
 #include <nrf_modem.h>
 #include <modem/lte_lc.h>
 #include <modem/modem_info.h>
 #endif /* CONFIG_NRF_MODEM_LIB */
-#include <net/socket.h>
+#include <zephyr/net/socket.h>
 #include <net/nrf_cloud.h>
 #undef __XSI_VISIBLE
 #define __XSI_VISIBLE 1
 #include <time.h>
-#include <posix/time.h>
+#include <zephyr/posix/time.h>
 #include <fw_info.h>
-#include <settings/settings.h>
+#include <zephyr/settings/settings.h>
 #include <debug/cpu_load.h>
 #include <date_time.h>
 
 #if defined(CONFIG_BOOTLOADER_MCUBOOT)
-#include <dfu/mcuboot.h>
+#include <dfu/dfu_target_mcuboot.h>
 #endif
 
 
@@ -45,7 +45,7 @@
 #include "gateway.h"
 #include "peripheral_dfu.h"
 
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(nrf_cloud_gateway, CONFIG_NRF_CLOUD_GATEWAY_LOG_LEVEL);
 
 #define CALIBRATION_PRESS_DURATION  K_SECONDS(5)
@@ -423,7 +423,7 @@ static void cloud_connect_work_fn(struct k_work *work)
 	ui_led_set_pattern(UI_CLOUD_CONNECTING, PWM_DEV_0);
 
 	/* Attempt cloud connection */
-	ret = nrf_cloud_connect(NULL);
+	ret = nrf_cloud_connect();
 	if (ret != NRF_CLOUD_CONNECT_RES_SUCCESS) {
 		k_work_cancel_delayable(&cloud_reboot_work);
 		/* Will not return from this function.
@@ -567,8 +567,8 @@ void cloud_event_handler(const struct nrf_cloud_evt *const evt)
 	case NRF_CLOUD_EVT_ERROR:
 		LOG_INF("NRF_CLOUD_EVT_ERROR");
 		break;
-	case NRF_CLOUD_EVT_RX_DATA:
-		LOG_INF("NRF_CLOUD_EVT_RX_DATA");
+	case NRF_CLOUD_EVT_RX_DATA_GENERAL:
+		LOG_INF("NRF_CLOUD_EVT_RX_DATA_GENERAL");
 		gateway_handler((const uint8_t *)&evt->data.ptr);
 		break;
 	case NRF_CLOUD_EVT_USER_ASSOCIATION_REQUEST:

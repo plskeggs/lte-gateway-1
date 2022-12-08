@@ -4,19 +4,19 @@
  * SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
  */
 
-#include <zephyr.h>
+#include <zephyr/kernel.h>
 #include <stdio.h>
 #include <strings.h>
 
-#include <bluetooth/bluetooth.h>
-#include <bluetooth/gatt.h>
-#include <bluetooth/uuid.h>
+#include <zephyr/bluetooth/bluetooth.h>
+#include <zephyr/bluetooth/gatt.h>
+#include <zephyr/bluetooth/uuid.h>
 #include <bluetooth/gatt_dm.h>
 #include <bluetooth/scan.h>
-#include <bluetooth/hci.h>
-#include <bluetooth/hci_err.h>
+#include <zephyr/bluetooth/hci.h>
+#include <zephyr/bluetooth/hci_err.h>
 #include <dk_buttons_and_leds.h>
-#include <settings/settings.h>
+#include <zephyr/settings/settings.h>
 
 #include "net/nrf_cloud.h"
 #include "ble.h"
@@ -36,7 +36,7 @@
 #define STR(x) #x
 #define BT_UUID_GATT_CCC_VAL_STR STR(BT_UUID_GATT_CCC_VAL)
 
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(ble, CONFIG_NRF_CLOUD_GATEWAY_LOG_LEVEL);
 
 static char buffer[MAX_BUF_SIZE];

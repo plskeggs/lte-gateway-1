@@ -7,8 +7,8 @@
 #ifndef _BLE_H_
 #define _BLE_H_
 
-#include <bluetooth/uuid.h>
-#include <bluetooth/gatt.h>
+#include <zephyr/bluetooth/uuid.h>
+#include <zephyr/bluetooth/gatt.h>
 
 #define MAX_SCAN_RESULTS 25
 #define BT_ADDR_LE_DEVICE_LEN 17

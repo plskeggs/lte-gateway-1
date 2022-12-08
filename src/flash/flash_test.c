@@ -1,6 +1,6 @@
-#include <zephyr.h>
-#include <drivers/flash.h>
-#include <drivers/gpio.h>
+#include <zephyr/kernel.h>
+#include <zephyr/drivers/flash.h>
+#include <zephyr/drivers/gpio.h>
 #include <stdio.h>
 #include <string.h>
 

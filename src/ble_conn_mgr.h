@@ -2,7 +2,7 @@
 #define _BLE_CONN_MGR_H_
 
 #include "ble.h"
-#include <bluetooth/uuid.h>
+#include <zephyr/bluetooth/uuid.h>
 
 #define MAX_UUID_PAIRS 68
 #define DEVICE_ADDR_LEN 18
