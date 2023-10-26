@@ -18,7 +18,7 @@ int g2c_send(const struct nrf_cloud_data *output);
 int gw_shadow_publish(const struct nrf_cloud_data *output);
 
 int gw_psk_id_get(char **id, size_t *id_len);
-int gateway_handler(const uint8_t *data);
+int gateway_handler(const struct nrf_cloud_data *data);
 
 #if defined(CONFIG_ENTER_52840_MCUBOOT_VIA_BUTTON)
 /* functions defined in the board's .c file */

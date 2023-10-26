@@ -28,7 +28,6 @@
 #include <modem/lte_lc.h>
 
 #include "config.h"
-#include "nrf_cloud_codec.h"
 #include "nrf_cloud_transport.h"
 #include "ble.h"
 #include "ble_codec.h"
@@ -43,6 +42,9 @@ LOG_MODULE_REGISTER(cli, CONFIG_NRF_CLOUD_GATEWAY_LOG_LEVEL);
 /* disable for now -- breaks BLE HCI after used */
 #define PRINT_CTLR_INFO_ENABLED 0
 
+/* set to 1 to enable showing cert list */
+#define DISPLAY_CERT_LIST 0
+
 enum ble_cmd_type {
 	BLE_CMD_ALL,
 	BLE_CMD_MAC,
@@ -54,7 +56,7 @@ extern uint32_t heap_stats(bool print);
 extern struct modem_param_info modem_param;
 
 /* was: CONFIG_AT_CMD_RESPONSE_MAX_LEN]; */
-static char response_buf[1024];
+static char response_buf[2048];
 
 static void set_at_prompt(const struct shell *shell, bool at_mode);
 void peripheral_dfu_set_test_mode(bool test);
@@ -113,7 +115,7 @@ void print_heap(bool detailed)
 	sys_heap_print_info(s_heap, detailed);
 }
 
-void print_modem_info(const struct shell *shell)
+void print_modem_info(const struct shell *shell, bool creds)
 {
 #ifdef CONFIG_MODEM_INFO
 	modem_info_init();
@@ -248,6 +250,20 @@ void print_modem_info(const struct shell *shell)
 #endif
 	}
 #endif
+
+	if (creds) {
+		response_buf[0] = '\0';
+		int err;
+
+		err = nrf_modem_at_cmd(response_buf, sizeof(response_buf), "%s", "AT%CMNG=1");
+		if (err < 0) {
+			shell_error(shell, "ERROR: %d", err);
+		} else if (err > 0) {
+			shell_error(shell, "ERROR: 0x%X", nrf_modem_at_err(err));
+		}
+
+		shell_print(shell, "%s", response_buf);
+	}
 }
 
 void print_connection_status(const struct shell *shell)
@@ -725,9 +741,6 @@ static const char *get_device_name(size_t idx)
 		if (dev == NULL) {
 			break;   /* end of list of scanned devices */
 		}
-		if (dev->name == NULL) {
-			continue; /* not all scan results include names */
-		}
 		if (strlen(dev->name) == 0) {
 			continue;
 		}
@@ -877,9 +890,14 @@ static int cmd_info_gateway(const struct shell *shell, size_t argc, char **argv)
 
 static int cmd_info_modem(const struct shell *shell, size_t argc, char **argv)
 {
-	ARG_UNUSED(argc);
-	ARG_UNUSED(argv);
-	print_modem_info(shell);
+	bool creds = false;
+
+	if (argc > 1) {
+		if (strcmp(argv[1], "verbose") == 0) {
+			creds = true;
+		}
+	}
+	print_modem_info(shell, creds);
 	return 0;
 }
 
@@ -1238,23 +1256,13 @@ static int app_cmd_at(const struct shell *shell, size_t argc, char **argv)
 		i++;
 	}
 
-	if (IS_ENABLED(CONFIG_NRF_CLOUD_GATEWAY_LOG_LEVEL_DBG)) {
-		if (i) {
-			shell_print(shell, "replaced %d \\n with <CR><LF>", i);
-		}
-
-		for (int i = 1; i < argc; i++) {
-			shell_print(shell, "argv[%d]:%s", i, argv[i]);
-		}
-	}
-
 	err = nrf_modem_at_cmd(response_buf, sizeof(response_buf), "%s", argv[1]);
 	if (err) {
 		shell_error(shell, "ERROR");
 		return -EINVAL;
 	}
 
-	shell_print(shell, "%sOK", response_buf);
+	shell_print(shell, "%s", response_buf);
 
 	return 0;
 }
@@ -1536,10 +1544,15 @@ void cli_init(void)
 		 * broke the config system regarding obscure, so for now,
 		 * set it manually on
 		 */
-		shell_obscure_set(shell, true);
+		shell_obscure_set(shell, IS_ENABLED(CONFIG_SHELL_START_OBSCURED));
 	}
 
-	shell_set_root_cmd("login");
+	if (IS_ENABLED(CONFIG_SHELL_START_OBSCURED)) {
+		shell_set_root_cmd("login");
+	} else {
+		shell_prompt_change(shell, CONFIG_SHELL_PROMPT_SECURE);
+	}
+
 #if defined(CONFIG_STARTING_LOG_OVERRIDE)
 	for (int i = 0; i < log_src_cnt_get(CONFIG_LOG_DOMAIN_ID); i++) {
 		if (IS_ENABLED(CONFIG_NRF_CLOUD_GATEWAY_LOG_LEVEL_DBG)) {
@@ -1566,7 +1579,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_info,
 	SHELL_COND_CMD(CONFIG_GATEWAY_DBG_CMDS,
 		       list, &dynamic_addr,
 		       "List known BLE MAC addresses.", NULL),
-	SHELL_CMD(modem, NULL, "Modem information.", cmd_info_modem),
+	SHELL_CMD(modem, NULL, "<verbose> Modem information.", cmd_info_modem),
 	SHELL_COND_CMD(CONFIG_GATEWAY_DBG_CMDS,
 		       param, &dynamic_param,
 		       "List parameters.", NULL),

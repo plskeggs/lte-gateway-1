@@ -14,10 +14,9 @@
 #if defined(CONFIG_NRF_MODEM_LIB)
 #include <nrf_socket.h>
 #endif
-
-#include "nrf_cloud_codec.h"
-#include "gateway.h"
 #include <net/nrf_cloud.h>
+
+#include "gateway.h"
 #include "nrf_cloud_mem.h"
 
 #include "ui.h"
@@ -136,7 +135,7 @@ static bool compare(const char *s1, const char *s2)
 	return !strncmp(s1, s2, strlen(s2));
 }
 
-int gateway_handler(const uint8_t *gw_data)
+int gateway_handler(const struct nrf_cloud_data *data)
 {
 	int ret = 0;
 	cJSON *root_obj;
@@ -156,10 +155,11 @@ int gateway_handler(const uint8_t *gw_data)
 	cJSON *value_arr;
 	uint8_t value_len = 0;
 
-	root_obj = cJSON_Parse(gw_data);
+	root_obj = cJSON_Parse(data->ptr);
 
 	if (root_obj == NULL) {
-		LOG_ERR("cJSON_Parse failed: %s", gw_data);
+		LOG_ERR("cJSON_Parse failed: %*s", data->len, (const char *)data->ptr);
+		LOG_HEXDUMP_ERR(((uint8_t *)((void *)(*((uint32_t *)data->ptr)))), data->len, "message");
 		return -ENOENT;
 	}
 

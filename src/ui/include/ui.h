@@ -230,6 +230,7 @@ void power_button_handler(struct ui_evt evt);
  */
 bool is_boot_selected(void);
 
+void ui_led_test(void);
 
 #ifdef __cplusplus
 }

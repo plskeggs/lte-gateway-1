@@ -4,6 +4,7 @@
 #include <malloc.h>
 #include <zephyr/logging/log.h>
 #include <net/fota_download.h>
+#include <net/download_client.h>
 #include <zephyr/sys/crc.h>
 #include <cJSON.h>
 

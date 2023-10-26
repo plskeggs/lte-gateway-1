@@ -5,6 +5,9 @@ CONFIG_BOARD_APRICITY_GATEWAY_NRF9160=y
 # Enable MPU
 CONFIG_ARM_MPU=y
 
+# Enable hardware stack protection
+CONFIG_HW_STACK_PROTECTION=y
+
 # Enable TrustZone-M
 CONFIG_ARM_TRUSTZONE_M=y
 
@@ -20,6 +23,3 @@ CONFIG_SERIAL=y
 # Enable console
 CONFIG_CONSOLE=y
 CONFIG_UART_CONSOLE=y
-
-# Disable entropy driver, as it's not yet implemented for nRF9160
-CONFIG_ENTROPY_NRF5_RNG=n

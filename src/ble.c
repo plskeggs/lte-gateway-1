@@ -14,7 +14,6 @@
 #include <bluetooth/gatt_dm.h>
 #include <bluetooth/scan.h>
 #include <zephyr/bluetooth/hci.h>
-#include <zephyr/bluetooth/hci_err.h>
 #include <dk_buttons_and_leds.h>
 #include <zephyr/settings/settings.h>
 
@@ -975,7 +974,7 @@ static struct bt_gatt_dm_cb discovery_cb = {
 
 int ble_discover(struct ble_device_conn *connection_ptr)
 {
-	int err;
+	int err = 0;
 	char *ble_addr = connection_ptr->addr;
 	struct bt_conn *conn = NULL;
 

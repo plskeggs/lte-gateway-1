@@ -19,8 +19,6 @@
 #include "ble_conn_mgr.h"
 #include "ble.h"
 #include "gateway.h"
-#include "service_info.h"
-#include "nrf_cloud_codec.h"
 #include "nrf_cloud_mem.h"
 #include "nrf_cloud_transport.h"
 
@@ -29,6 +27,10 @@
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(ble_codec, CONFIG_NRF_CLOUD_GATEWAY_LOG_LEVEL);
 
+typedef int (*gateway_state_handler_t)(void *root_obj);
+
+extern void nrf_cloud_register_gateway_state_handler(gateway_state_handler_t handler);
+
 extern struct ble_scanned_dev ble_scanned_devices[MAX_SCAN_RESULTS];
 
 static char service_buffer[MAX_SERVICE_BUF_SIZE];
@@ -36,6 +38,8 @@ static char service_buffer[MAX_SERVICE_BUF_SIZE];
 static bool first_service = true;
 static bool first_chrc = true;
 static bool desired_conns_strings = false;
+
+#define JSON_KEY_SRVC_INFO	"serviceInfo"
 
 /* define macros to enable memory allocation error checking and
  * cleanup, and also improve readability
@@ -646,60 +650,59 @@ int gateway_shadow_data_encode(void *modem_ptr, struct gw_msg *msg)
 {
 	int ret = -ENOMEM;
 	__ASSERT_NO_MSG(msg != NULL);
-
 	cJSON *root_obj = cJSON_CreateObject();
 	cJSON *state_obj = cJSON_CreateObject();
 	cJSON *reported_obj = cJSON_CreateObject();
 	cJSON *device_obj = cJSON_CreateObject();
+	cJSON *svc_inf_obj = cJSON_AddObjectToObjectCS(device_obj, JSON_KEY_SRVC_INFO);
 
 	if ((root_obj == NULL) || (state_obj == NULL) ||
-	    (reported_obj == NULL) || (device_obj == NULL)) {
+	    (reported_obj == NULL) || (device_obj == NULL) || (svc_inf_obj == NULL)) {
 		LOG_ERR("Error creating shadow data");
 		goto cleanup;
 	}
 
-	const char *const ui[] = {
-#if CONFIG_MODEM_INFO
-	/* not yet plumbed to report this: "RSRP", */
-#endif
-	};
-
-	const char *const fota[] = {
-		"APP",
-		"MODEM",
-		"BOOT",
-	};
-
-	size_t item_cnt = 0;
-
 #ifdef CONFIG_MODEM_INFO
-	int val = 0;
-	struct modem_param_info *modem = (struct modem_param_info *)modem_ptr;
+	struct nrf_cloud_modem_info modem = {
+		.device = NRF_CLOUD_INFO_SET,
+		.network = NRF_CLOUD_INFO_SET,
+		.sim = NRF_CLOUD_INFO_SET,
+		.mpi = (struct modem_param_info *)modem_ptr
+	};
 
-	if (modem == NULL) {
-		LOG_ERR("Unable to obtain modem parameters");
-		ret = -EINVAL;
+	if (modem_ptr == NULL) {
+		LOG_INF("Library will query modem info");
+	}
+	LOG_INF("encoding modem info...");
+	ret = nrf_cloud_modem_info_json_encode(&modem, device_obj);
+	if (ret < 0) {
 		goto cleanup;
-	} else {
-		val = modem_info_json_object_encode(modem, device_obj);
-		if (val > 0) {
-			item_cnt = (size_t)val;
-		} else if (val == 0) {
-			ret = -ECHILD;
-			goto cleanup;
-		} else if (val < 0) {
-			ret = val;
-			goto cleanup;
-		}
 	}
 #endif
+	struct nrf_cloud_svc_info_fota fota = {
+		.application = IS_ENABLED(CONFIG_BOOTLOADER_MCUBOOT),
+		.bootloader = IS_ENABLED(CONFIG_SECURE_BOOT),
+		.modem = true,
+		._rsvd = 0
+	};
+	struct nrf_cloud_svc_info_ui ui;
+	struct nrf_cloud_svc_info info = {
+		.fota = &fota,
+		.ui = &ui
+	};
 
-	if (service_info_json_object_encode(ui, ARRAY_SIZE(ui),
-					    fota, ARRAY_SIZE(fota),
-					    SERVICE_INFO_FOTA_VER_CURRENT,
-					    true,
-					    device_obj) == 0) {
-		++item_cnt;
+	memset(&ui, 0, sizeof(ui));
+
+#if CONFIG_GATEWAY_BLE_FOTA
+	cJSON *fota_obj = cJSON_GetObjectItem(svc_inf_obj, NRF_CLOUD_FOTA_VER_STR);
+
+	cJSON_AddBoolToObjectCS(fota_obj, "fota_v2_ble",
+				IS_ENABLED(CONFIG_GATEWAY_BLE_FOTA));
+#endif
+
+	LOG_INF("encoding service info...");
+	if (nrf_cloud_service_info_json_encode(&info, svc_inf_obj) < 0) {
+		goto cleanup;
 	}
 
 	CJADDREFCS(reported_obj, "device", device_obj);

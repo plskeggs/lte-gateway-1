@@ -10,7 +10,7 @@
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/bluetooth/gatt.h>
 
-#define MAX_SCAN_RESULTS 25
+#define MAX_SCAN_RESULTS 10
 #define BT_ADDR_LE_DEVICE_LEN 17
 #define BT_ADDR_LE_DEVICE_LEN_SHIFT BT_ADDR_LE_DEVICE_LEN+2
 #define BT_ADDR_LE_TYPE_LEN 6

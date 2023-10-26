@@ -235,8 +235,43 @@ int ui_init(ui_callback_t cb)
 bool ui_button_is_active(uint32_t button)
 {
 #if defined(CONFIG_DK_LIBRARY)
-	return dk_get_buttons() & BIT((button - 1));
+	return !(dk_get_buttons() & BIT((button - 1)));
 #else
 	return false;
 #endif
 }
+
+void ui_led_test(void)
+{
+	const char *names[] = {
+		"UI_LTE_DISCONNECTED",
+		"UI_LTE_CONNECTING",
+		"UI_LTE_CONNECTED",
+		"UI_CLOUD_CONNECTING",
+		"UI_CLOUD_CONNECTED",
+		"UI_CLOUD_PAIRING",
+		"UI_ACCEL_CALIBRATING",
+		"UI_LED_ERROR_CLOUD",
+		"UI_LED_ERROR_MODEM_REC",
+		"UI_LED_ERROR_MODEM_IRREC",
+		"UI_LED_ERROR_LTE_LC",
+		"UI_LED_ERROR_UNKNOWN",
+		"UI_LED_GPS_SEARCHING",
+		"UI_LED_GPS_BLOCKED",
+		"UI_LED_GPS_FIX",
+		"UI_BLE_ERROR",
+		"UI_BLE_UPDATE",
+		"UI_BLE_BUTTON",
+		"UI_BLE_OFF",
+		"UI_BLE_DISCONNECTED",
+		"UI_BLE_CONNECTED"
+	};
+
+	for (int i = 0; i < ARRAY_SIZE(names); i++) {
+		printk("Pattern %d: %s\n", i, names[i]);
+		ui_led_set_pattern((enum ui_led_pattern)i, PWM_DEV_0);
+		ui_led_set_pattern((enum ui_led_pattern)i, PWM_DEV_1);
+		k_sleep(K_SECONDS(10));
+	}
+}
+

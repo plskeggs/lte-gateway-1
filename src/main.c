@@ -543,8 +543,6 @@ void fota_done_handler(const struct nrf_cloud_evt *const evt)
 
 void cloud_event_handler(const struct nrf_cloud_evt *const evt)
 {
-	struct modem_param_info *modem;
-
 	switch (evt->type) {
 	case NRF_CLOUD_EVT_TRANSPORT_CONNECTED:
 	case NRF_CLOUD_EVT_TRANSPORT_CONNECTING:
@@ -561,15 +559,15 @@ void cloud_event_handler(const struct nrf_cloud_evt *const evt)
 #endif
 		atomic_set(&cloud_association, CLOUD_ASSOCIATION_STATE_READY);
 
-		modem = query_modem_info();
-		set_shadow_modem(modem);
+		LOG_INF("Set shadow modem...");
+		set_shadow_modem(NULL);
 		break;
 	case NRF_CLOUD_EVT_ERROR:
 		LOG_INF("NRF_CLOUD_EVT_ERROR");
 		break;
 	case NRF_CLOUD_EVT_RX_DATA_GENERAL:
 		LOG_INF("NRF_CLOUD_EVT_RX_DATA_GENERAL");
-		gateway_handler((const uint8_t *)&evt->data.ptr);
+		gateway_handler(&evt->data);
 		break;
 	case NRF_CLOUD_EVT_USER_ASSOCIATION_REQUEST:
 		LOG_INF("NRF_CLOUD_EVT_USER_ASSOCIATION_REQUEST");
@@ -592,6 +590,9 @@ void cloud_event_handler(const struct nrf_cloud_evt *const evt)
 	case NRF_CLOUD_EVT_PINGRESP:
 		LOG_INF("NRF_CLOUD_EVT_PINGRESP");
 		break;
+	case NRF_CLOUD_EVT_RX_DATA_SHADOW:
+		LOG_INF("NRF_CLOUD_EVT_RX_DATA_SHADOW");
+		break;
 	default:
 		LOG_WRN("Unknown cloud event type: %d", evt->type);
 		break;
@@ -602,8 +603,10 @@ struct modem_param_info * query_modem_info(void)
 {
 #ifdef CONFIG_MODEM_INFO
 	modem_info_init();
+	LOG_INF("modem info params init");
 	modem_info_params_init(&modem_param);
 
+	LOG_INF("modem info params get");
 	int ret = modem_info_params_get(&modem_param);
 
 	if (ret) {
@@ -716,7 +719,7 @@ void connection_evt_handler(const struct nrf_cloud_evt *const evt)
 
 		cloud_connection_status = false;
 		LOG_INF("NRF_CLOUD_EVT_TRANSPORT_DISCONNECTED: %d", evt->status);
-		ui_led_set_pattern(UI_LTE_CONNECTED, PWM_DEV_0);
+		ui_led_set_pattern(UI_LTE_DISCONNECTED, PWM_DEV_0);
 
 		switch (evt->status) {
 		case NRF_CLOUD_DISCONNECT_INVALID_REQUEST:
@@ -770,11 +773,9 @@ static void cloud_api_init(void)
 {
 	int ret;
 #if defined(CONFIG_NRF_CLOUD_CLIENT_ID_SRC_RUNTIME)
-	char *id;
 	size_t id_len = NRF_CLOUD_CLIENT_ID_MAX_LEN;
-#else
-	char *id = NULL;
 #endif
+	char *id = NULL;
 	struct nrf_cloud_init_param init_param = {
 		cloud_event_handler, id, NULL
 	};
@@ -838,6 +839,7 @@ connected:
 	ui_led_set_pattern(UI_LTE_CONNECTED, PWM_DEV_0);
 
 #endif /* defined(CONFIG_NRF_MODEM_LIB) */
+	connect_to_cloud(1);
 	return 0;
 }
 
@@ -1022,7 +1024,7 @@ static void log_uart_pins(void)
 #endif
 }
 
-void main(void)
+int main(void)
 {
 	int err;
 
@@ -1086,4 +1088,5 @@ void main(void)
 			CONFIG_CLOUD_CONNECT_RETRY_DELAY);
 		k_sleep(K_SECONDS(CONFIG_CLOUD_CONNECT_RETRY_DELAY));
 	}
+	return 0;
 }

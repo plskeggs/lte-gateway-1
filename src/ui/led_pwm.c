@@ -75,11 +75,11 @@ static const struct led_effect effect[] = {
 	[UI_BLE_ERROR] = LED_EFFECT_LED_BREATHE(UI_LED_ON_PERIOD_ERROR,
 					      UI_LED_OFF_PERIOD_ERROR,
 					      UI_BLE_ERROR_COLOR),
-	[UI_BLE_BUTTON] = LED_EFFECT_LED_BREATHE(UI_LED_ON_PERIOD_MED,
-					      UI_LED_OFF_PERIOD_MED,
-					      UI_BLE_UPDATE_COLOR),
 	[UI_BLE_UPDATE] = LED_EFFECT_LED_BREATHE(UI_LED_ON_PERIOD_FAST,
 					      UI_LED_OFF_PERIOD_FAST,
+					      UI_BLE_UPDATE_COLOR),
+	[UI_BLE_BUTTON] = LED_EFFECT_LED_BREATHE(UI_LED_ON_PERIOD_MED,
+					      UI_LED_OFF_PERIOD_MED,
 					      UI_BLE_UPDATE_COLOR),
 	[UI_BLE_OFF] = LED_EFFECT_LED_BREATHE(UI_LED_ON_PERIOD_NORMAL,
 					      UI_LED_OFF_PERIOD_NORMAL,
@@ -100,15 +100,11 @@ static struct led leds_1;
 static struct led leds_2;
 
 static const size_t led_1_pins[3] = {
-	CONFIG_UI_LED_1_RED_PIN,
-	CONFIG_UI_LED_1_GREEN_PIN,
-	CONFIG_UI_LED_1_BLUE_PIN,
+	0, 1, 2
 };
 
 static const size_t led_2_pins[3] = {
-	CONFIG_UI_LED_2_RED_PIN,
-	CONFIG_UI_LED_2_GREEN_PIN,
-	CONFIG_UI_LED_2_BLUE_PIN,
+	0, 1, 2
 };
 
 static void pwm_out(struct led *led, struct led_color *color, uint8_t led_num)
@@ -117,11 +113,13 @@ static void pwm_out(struct led *led, struct led_color *color, uint8_t led_num)
 
 	for (i = 0; i < ARRAY_SIZE(color->c); i++) {
 		if (led_num == 0) {
-			pwm_pin_set_usec(led->pwm_dev, led_1_pins[i],
-					 255, color->c[i], 0);
+			pwm_set(led->pwm_dev, led_1_pins[i],
+				255 * NSEC_PER_USEC,
+				(255 - color->c[i]) * NSEC_PER_USEC, 0);
 		} else {
-			pwm_pin_set_usec(led->pwm_dev, led_2_pins[i],
-					 255, color->c[i], 0);
+			pwm_set(led->pwm_dev, led_2_pins[i],
+				255 * NSEC_PER_USEC,
+				(255 - color->c[i]) * NSEC_PER_USEC, 0);
 		}
 	}
 }
@@ -242,11 +240,11 @@ int ui_leds_init(void)
 	const char *dev2_name = CONFIG_UI_LED_PWM_2_DEV_NAME;
 	int err = 0;
 
-	leds_1.pwm_dev = device_get_binding(dev1_name);
+	leds_1.pwm_dev = DEVICE_DT_GET(DT_ALIAS(rgb_pwm));
 	leds_1.id = 0;
 	leds_1.effect = &effect[UI_LTE_DISCONNECTED];
 
-	if (!leds_1.pwm_dev) {
+	if (!leds_1.pwm_dev || !device_is_ready(leds_1.pwm_dev)) {
 		LOG_ERR("Could not bind to device %s", dev1_name);
 		return -ENODEV;
 	}
@@ -254,11 +252,11 @@ int ui_leds_init(void)
 	k_work_init_delayable(&leds_1.work, led_1_work_handler);
 	led_update(&leds_1);
 
-	leds_2.pwm_dev = device_get_binding(dev2_name);
+	leds_2.pwm_dev = DEVICE_DT_GET(DT_ALIAS(rgb2_pwm));
 	leds_2.id = 0;
 	leds_2.effect = &effect[UI_BLE_DISCONNECTED];
 
-	if (!leds_2.pwm_dev) {
+	if (!leds_2.pwm_dev || !device_is_ready(leds_2.pwm_dev)) {
 		LOG_ERR("Could not bind to device %s", dev2_name);
 		return -ENODEV;
 	}
