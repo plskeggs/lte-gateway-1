@@ -693,13 +693,6 @@ int gateway_shadow_data_encode(void *modem_ptr, struct gw_msg *msg)
 
 	memset(&ui, 0, sizeof(ui));
 
-#if CONFIG_GATEWAY_BLE_FOTA
-	cJSON *fota_obj = cJSON_GetObjectItem(svc_inf_obj, NRF_CLOUD_FOTA_VER_STR);
-
-	cJSON_AddBoolToObjectCS(fota_obj, "fota_v2_ble",
-				IS_ENABLED(CONFIG_GATEWAY_BLE_FOTA));
-#endif
-
 	LOG_INF("encoding service info...");
 	if (nrf_cloud_service_info_json_encode(&info, svc_inf_obj) < 0) {
 		goto cleanup;
