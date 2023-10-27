@@ -65,8 +65,9 @@
 			   /* 6: COEX0 */
 			   /* 7: COEX1 */
 			   /* 8: COEX2 */
-                          <9 0 &gpio0 13 0>,
-       		   <10 0 &gpio0 5 0>;
+			   <9 0 &gpio0 13 0>,
+		   <10 0 &gpio0 5 0>,
+		   <11 0 &gpio0 9 0>;
 	};
 
 	nrf52840_reset: gpio-reset {
@@ -83,6 +84,12 @@
 		compatible = "nordic,nrf9160dk-nrf52840-boot";
 		status = "okay";
 		gpios = <&interface_to_nrf52840 10 GPIO_PULL_UP>;
+	};
+
+	ext_mem_ctrl: gpio-ext-mem-ctrl {
+		compatible = "nordic,ext-mem-ctrl";
+		status = "okay";
+		gpios = <&interface_to_nrf52840 11 0>;
 	};
 
 	aliases {

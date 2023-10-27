@@ -34,6 +34,7 @@
 #include "ble_conn_mgr.h"
 #include "peripheral_dfu.h"
 #include "gateway.h"
+#include "flash_test.h"
 
 LOG_MODULE_REGISTER(cli, CONFIG_NRF_CLOUD_GATEWAY_LOG_LEVEL);
 
@@ -79,6 +80,21 @@ char *rem_eol(const char *s, char *d, int len)
 		p++;
 	}
 	return d;
+}
+
+void cmd_testflash(const struct shell *shell)
+{
+	int ret;
+
+	shell_print(shell, "Testing flash...");
+
+	ret = flash_test();
+
+	if (ret) {
+		shell_error(shell, "Error testing flash: %d", ret);
+	} else {
+		shell_print(shell, "Test passed.");
+	}
 }
 
 void print_fw_info(const struct shell *shell, bool verbose)
@@ -1624,6 +1640,7 @@ SHELL_CMD_ARG_REGISTER(at, NULL, "<enable | AT<cmd> | exit> Execute an AT "
 SHELL_CMD_ARG_REGISTER(session, NULL, "<0 | 1> Get or change persistent "
 				      "sessions flag.",
 		       cmd_session, 0, 1);
+SHELL_CMD_REGISTER(testflash, NULL, "Test the external flash.", cmd_testflash);
 SHELL_CMD_REGISTER(reboot, NULL, "Reboot the gateway.", cmd_reboot);
 SHELL_CMD_REGISTER(shutdown, NULL, "Shutdown the gateway.", cmd_shutdown);
 SHELL_CMD_REGISTER(exit, NULL, "Exit 'select at' mode.", app_exit);

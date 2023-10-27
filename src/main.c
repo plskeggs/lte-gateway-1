@@ -176,6 +176,7 @@ static void connection_evt_handler(const struct nrf_cloud_evt *const evt);
 static void no_sim_go_offline(struct k_work *work);
 static void date_time_event_handler(const struct date_time_evt *evt);
 struct modem_param_info * query_modem_info(void);
+int flash_test(const struct device *dev);
 
 bool get_lte_connection_status(void)
 {
@@ -1018,9 +1019,6 @@ static void log_uart_pins(void)
 	uart_config_get(uart_1_dev, &config);
 	LOG_INF("UART1 speed:%u, flow:%d", config.baudrate,
 		config.flow_ctrl);
-
-	LOG_INF("Reset pin:%d",
-		CONFIG_BOARD_NRF52840_GPIO_RESET_PIN);
 #endif
 }
 
@@ -1088,5 +1086,6 @@ int main(void)
 			CONFIG_CLOUD_CONNECT_RETRY_DELAY);
 		k_sleep(K_SECONDS(CONFIG_CLOUD_CONNECT_RETRY_DELAY));
 	}
+
 	return 0;
 }
