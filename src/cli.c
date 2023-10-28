@@ -86,9 +86,13 @@ void cmd_testflash(const struct shell *shell)
 {
 	int ret;
 
-	shell_print(shell, "Testing flash...");
-
-	ret = flash_test();
+	if (IS_ENABLED(CONFIG_FLASH_TEST)) {
+		shell_print(shell, "Testing flash...");
+		ret = flash_test();
+	} else {
+		shell_print(shell, "Test not enabled");
+		ret = -ENOTSUP;
+	}
 
 	if (ret) {
 		shell_error(shell, "Error testing flash: %d", ret);
