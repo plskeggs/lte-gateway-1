@@ -20,7 +20,7 @@ static struct ble_device_conn connected_ble_devices[CONFIG_BT_MAX_CONN];
 
 static struct desired_conn desired_connections[CONFIG_BT_MAX_CONN];
 
-#define CONN_MGR_STACK_SIZE 3072
+#define CONN_MGR_STACK_SIZE 4096
 #define CONN_MGR_PRIORITY 1
 
 static struct uuid_handle_pair *find_pair_by_handle(uint16_t handle,
