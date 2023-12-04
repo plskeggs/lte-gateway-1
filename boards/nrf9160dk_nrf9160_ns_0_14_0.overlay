@@ -9,7 +9,7 @@
 
 /* External flash device is disabled by default */
 &mx25r64 {
-	status = "okay";
+	status = "disabled";
 };
 
 /* Enable high drive mode for the SPI3 pins to get a square signal at 8 MHz */

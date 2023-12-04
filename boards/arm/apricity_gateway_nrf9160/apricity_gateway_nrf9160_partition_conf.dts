@@ -41,7 +41,7 @@
  * ARM TrustZone-M support
  * - Lowest 88 kB SRAM allocated to Secure image (sram0_s).
  * - 40 kB SRAM reserved for and used by the modem library
- *   library.
+ *   (sram0_modem). This memory is Non-Secure.
  * - Upper 128 kB allocated to Non-Secure image (sram0_ns).
  *   When building with TF-M, both sram0_modem and sram0_ns
  *   are allocated to the Non-Secure image.

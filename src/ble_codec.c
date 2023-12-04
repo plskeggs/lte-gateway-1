@@ -30,6 +30,10 @@ LOG_MODULE_REGISTER(ble_codec, CONFIG_NRF_CLOUD_GATEWAY_LOG_LEVEL);
 typedef int (*gateway_state_handler_t)(void *root_obj);
 
 extern void nrf_cloud_register_gateway_state_handler(gateway_state_handler_t handler);
+extern int nrf_cloud_modem_info_json_encode(const struct nrf_cloud_modem_info *const mod_inf,
+					    cJSON *const mod_inf_obj);
+extern int nrf_cloud_service_info_json_encode(const struct nrf_cloud_svc_info *const svc_inf,
+					      cJSON *const svc_inf_obj);
 
 extern struct ble_scanned_dev ble_scanned_devices[MAX_SCAN_RESULTS];
 
@@ -1289,9 +1293,36 @@ static int gateway_state_handler(void *root_obj)
 	}
 
 	if (!changed) {
-		LOG_DBG("Ignoring gateway state change");
+		struct nct_cc_data msg = {
+			.opcode = NCT_CC_OPCODE_UPDATE_REQ,
+			.message_id = NCT_MSG_ID_STATE_REPORT,
+		};
+		cJSON *delta_obj;
+		cJSON *desired_obj;
+		int ret;
+
+		/* Ack whatever the delta is */
+		delta_obj = cJSON_CreateObject();
+		state_obj = cJSON_AddObjectToObjectCS(delta_obj, NRF_CLOUD_JSON_KEY_STATE);
+		desired_obj = cJSON_DetachItemFromObject(root_obj, NRF_CLOUD_JSON_KEY_STATE);
+		cJSON_AddItemToObjectCS(state_obj, NRF_CLOUD_JSON_KEY_REP, desired_obj);
+
+		msg.data.ptr = cJSON_PrintUnformatted(delta_obj);
+		msg.data.len = strlen(msg.data.ptr);
+
+		if (msg.data.ptr) {
+			ret = nct_cc_send(&msg);
+			nrf_cloud_free((void *)msg.data.ptr);
+			if (ret) {
+				LOG_ERR("nct_cc_send failed %d", ret);
+			}
+		}
+		desired_obj = cJSON_DetachItemFromObject(state_obj, NRF_CLOUD_JSON_KEY_REP);
+		cJSON_AddItemToObjectCS(root_obj, NRF_CLOUD_JSON_KEY_STATE, desired_obj);
+		cJSON_Delete(delta_obj);
 		return 0;
 	}
+
 	LOG_DBG("Gateway state change detected");
 
 	ble_conn_mgr_clear_desired(false);

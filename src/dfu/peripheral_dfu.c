@@ -522,9 +522,12 @@ int peripheral_dfu_start(const char *host, const char *file, int sec_tag,
 			 const char *apn, size_t fragment_size)
 {
 	int err = -1;
-
+	const int sec_tag_list[1] = {
+		sec_tag
+	};
 	struct download_client_cfg config = {
-		.sec_tag = sec_tag,
+		.sec_tag_list = sec_tag_list,
+		.sec_tag_count = ARRAY_SIZE(sec_tag_list),
 		.pdn_id = 0,
 		.frag_size_override = fragment_size,
 		.set_tls_hostname = (sec_tag != -1),
@@ -539,7 +542,7 @@ int peripheral_dfu_start(const char *host, const char *file, int sec_tag,
 
 	first_fragment = true;
 
-	err = download_client_connect(&dlc, host, &config);
+	err = download_client_set_host(&dlc, host, &config);
 	if (err != 0) {
 		peripheral_dfu_cleanup();
 		return err;
