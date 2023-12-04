@@ -52,8 +52,6 @@ enum ble_cmd_type {
 	BLE_CMD_NAME
 };
 
-extern uint32_t heap_stats(bool print);
-
 extern struct modem_param_info modem_param;
 
 /* was: CONFIG_AT_CMD_RESPONSE_MAX_LEN]; */

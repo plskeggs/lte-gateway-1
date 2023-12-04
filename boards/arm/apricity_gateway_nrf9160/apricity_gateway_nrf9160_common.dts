@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 Nordic Semiconductor ASA
+ * Copyright (c) 2024 Nordic Semiconductor ASA
  *
  * SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
  */
@@ -12,6 +12,7 @@
 		zephyr,console = &uart0;
 		zephyr,shell-uart = &uart0;
 		zephyr,uart-mcumgr = &uart0;
+		zephyr,bt-uart=&uart1;
 	};
 
 	buttons {
@@ -66,8 +67,8 @@
 			   /* 7: COEX1 */
 			   /* 8: COEX2 */
 			   <9 0 &gpio0 13 0>,
-		   <10 0 &gpio0 5 0>,
-		   <11 0 &gpio0 9 0>;
+			   <10 0 &gpio0 5 0>,
+			   <11 0 &gpio0 9 0>;
 	};
 
 	nrf52840_reset: gpio-reset {
@@ -143,6 +144,7 @@
 	pinctrl-names = "default", "sleep";
 	cs-gpios = <&gpio0 8 1>;
 	w25q64jv: w25q64jv@0 {
+		status = "okay";
 		compatible = "jedec,spi-nor";
 		reg = <0>;
 		spi-max-frequency = <80000000>;
@@ -247,18 +249,6 @@
 	};
 };
 
-&timer0 {
-	status = "okay";
-};
-
-&timer1 {
-	status = "okay";
-};
-
-&timer2 {
-	status = "okay";
-};
-
 &uart0 {
 	compatible = "nordic,nrf-uarte";
 	current-speed = <115200>;
@@ -304,13 +294,10 @@
 		slot1_ns_partition: partition@c0000 {
 			label = "image-1-nonsecure";
 		};
-		scratch_partition: partition@f0000 {
-			label = "image-scratch";
-			reg = <0x000f0000 0xa000>;
-		};
-		storage_partition: partition@fa000 {
+		/* 0xf0000 to 0xf7fff reserved for TF-M partitions */
+		storage_partition: partition@f8000 {
 			label = "storage";
-			reg = <0x000fa000 0x00006000>;
+			reg = <0x000f8000 0x00008000>;
 		};
 	};
 };

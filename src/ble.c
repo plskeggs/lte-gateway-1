@@ -372,10 +372,9 @@ static void discovery_completed(struct bt_gatt_dm *disc, void *ctx)
 	bt_gatt_dm_continue(disc, NULL);
 }
 
-/* Despite the name. This is what is called at the end of a discovery service.*/
-static void discovery_service_not_found(struct bt_conn *conn, void *ctx)
+static void discovery_service_complete(struct bt_conn *conn, void *ctx)
 {
-	LOG_DBG("Service not found!");
+	LOG_DBG("Discovery complete.");
 
 	char addr[BT_ADDR_LE_STR_LEN];
 	char addr_trunc[BT_ADDR_STR_LEN];
@@ -968,7 +967,7 @@ int ble_subscribe_device(struct bt_conn *conn, bool subscribe)
 
 static struct bt_gatt_dm_cb discovery_cb = {
 	.completed = discovery_completed,
-	.service_not_found = discovery_service_not_found,
+	.service_not_found = discovery_service_complete,
 	.error_found = discovery_error_found,
 };
 

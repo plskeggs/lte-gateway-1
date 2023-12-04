@@ -177,6 +177,7 @@ static void no_sim_go_offline(struct k_work *work);
 static void date_time_event_handler(const struct date_time_evt *evt);
 struct modem_param_info * query_modem_info(void);
 int flash_test(const struct device *dev);
+static void lte_handler(const struct lte_lc_evt *const evt);
 
 bool get_lte_connection_status(void)
 {
@@ -270,17 +271,6 @@ void error_handler(enum error_type err_type, int err_code)
 		k_cpu_idle();
 	}
 #endif /* CONFIG_DEBUG */
-}
-
-void k_sys_fatal_error_handler(unsigned int reason,
-			       const z_arch_esf_t *esf)
-{
-	ARG_UNUSED(esf);
-
-	LOG_PANIC();
-	LOG_ERR("Running main.c error handler");
-	error_handler(ERROR_SYSTEM_FAULT, reason);
-	CODE_UNREACHABLE;
 }
 
 void cloud_error_handler(int err)
@@ -548,6 +538,7 @@ void cloud_event_handler(const struct nrf_cloud_evt *const evt)
 	case NRF_CLOUD_EVT_TRANSPORT_CONNECTED:
 	case NRF_CLOUD_EVT_TRANSPORT_CONNECTING:
 	case NRF_CLOUD_EVT_TRANSPORT_DISCONNECTED:
+	case NRF_CLOUD_EVT_TRANSPORT_CONNECT_ERROR:
 		connection_evt_handler(evt);
 		break;
 	case NRF_CLOUD_EVT_READY:
@@ -715,7 +706,8 @@ void connection_evt_handler(const struct nrf_cloud_evt *const evt)
 		atomic_set(&cloud_connect_attempts, 0);
 
 		/* LOG_INF("Persistent Sessions = %u", evt->data.persistent_session); */
-	} else if (evt->type == NRF_CLOUD_EVT_TRANSPORT_DISCONNECTED) {
+	} else if ((evt->type == NRF_CLOUD_EVT_TRANSPORT_DISCONNECTED) ||
+		   (evt->type == NRF_CLOUD_EVT_TRANSPORT_CONNECT_ERROR)){
 		int32_t connect_wait_s = CONFIG_CLOUD_CONNECT_RETRY_DELAY;
 
 		cloud_connection_status = false;
@@ -811,64 +803,37 @@ static void cloud_api_init(void)
 #endif
 }
 
-/**@brief Configures modem to provide LTE link. Blocks until link is
- * successfully established.
- */
-static int modem_configure(void)
+void modem_init(void)
 {
 #if defined(CONFIG_NRF_MODEM_LIB)
-	if (IS_ENABLED(CONFIG_LTE_AUTO_INIT_AND_CONNECT)) {
-		/* Do nothing, modem is already turned on */
-		/* and connected */
-		goto connected;
-	}
-
-	ui_led_set_pattern(UI_LTE_CONNECTING, PWM_DEV_0);
-	LOG_INF("Connecting to LTE network.");
-	LOG_INF("This may take several minutes.");
-
-	int err = lte_lc_init_and_connect();
-	if (err) {
-		lte_connection_status = false;
-		LOG_ERR("LTE link could not be established.");
-		return err;
-	}
-
-connected:
-	lte_connection_status = true;
-	LOG_INF("Connected to LTE network.");
-	ui_led_set_pattern(UI_LTE_CONNECTED, PWM_DEV_0);
-
-#endif /* defined(CONFIG_NRF_MODEM_LIB) */
-	connect_to_cloud(1);
-	return 0;
-}
-
-void handle_nrf_modem_lib_init_ret(void)
-{
-#if defined(CONFIG_NRF_MODEM_LIB) && !defined(CONFIG_NRF_CLOUD_FOTA)
-	int ret = nrf_modem_lib_get_init_ret();
-
+	/*
+	 * If there is a pending modem delta firmware update stored, nrf_modem_lib_init will
+	 * attempt to install it before initializing the modem library, and return a
+	 * positive value to indicate that this occurred. This code can be used to
+	 * determine whether the update was successful.
+	 */
+	int ret = nrf_modem_lib_init();
+	LOG_DBG("nrf_modem_lib_init() returned %d", ret);
 	/* Handle return values relating to modem firmware update */
 	switch (ret) {
 	case 0:
 		/* Initialization successful, no action required. */
 		break;
-	case MODEM_DFU_RESULT_OK:
+	case NRF_MODEM_DFU_RESULT_OK:
 		LOG_INF("MODEM UPDATE OK. Will run new firmware");
 #if defined(CONFIG_REBOOT)
 		sys_reboot(SYS_REBOOT_COLD);
 #endif
 		break;
-	case MODEM_DFU_RESULT_UUID_ERROR:
-	case MODEM_DFU_RESULT_AUTH_ERROR:
+	case NRF_MODEM_DFU_RESULT_UUID_ERROR:
+	case NRF_MODEM_DFU_RESULT_AUTH_ERROR:
 		LOG_ERR("MODEM UPDATE ERROR %d. Will run old firmware", ret);
 #if defined(CONFIG_REBOOT)
 		sys_reboot(SYS_REBOOT_COLD);
 #endif
 		break;
-	case MODEM_DFU_RESULT_HARDWARE_ERROR:
-	case MODEM_DFU_RESULT_INTERNAL_ERROR:
+	case NRF_MODEM_DFU_RESULT_HARDWARE_ERROR:
+	case NRF_MODEM_DFU_RESULT_INTERNAL_ERROR:
 		LOG_ERR("MODEM UPDATE FATAL ERROR %d. Modem failiure", ret);
 #if defined(CONFIG_REBOOT)
 		sys_reboot(SYS_REBOOT_COLD);
@@ -884,6 +849,37 @@ void handle_nrf_modem_lib_init_ret(void)
 		CODE_UNREACHABLE;
 	}
 #endif /* CONFIG_NRF_MODEM_LIB */
+}
+
+/**@brief Configures modem to provide LTE link. Blocks until link is
+ * successfully established.
+ */
+static int modem_configure(void)
+{
+#if defined(CONFIG_NRF_MODEM_LIB)
+	int err;
+
+	ui_led_set_pattern(UI_LTE_CONNECTING, PWM_DEV_0);
+	LOG_INF("Connecting to LTE network.");
+	LOG_INF("This may take several minutes.");
+
+	err = lte_lc_init_and_connect();
+	if (err) {
+		lte_connection_status = false;
+		LOG_ERR("LTE link could not be established.");
+		return err;
+	}
+
+	lte_lc_register_handler(lte_handler);
+
+	lte_connection_status = true;
+	LOG_INF("Connected to LTE network.");
+	ui_led_set_pattern(UI_LTE_CONNECTED, PWM_DEV_0);
+
+#endif /* defined(CONFIG_NRF_MODEM_LIB) */
+	cloud_api_init();
+	connect_to_cloud(1);
+	return 0;
 }
 
 static void no_sim_go_offline(struct k_work *work)
@@ -1037,6 +1033,8 @@ int main(void)
 		settings_load();
 	}
 
+	modem_init();
+
 	k_work_queue_start(&application_work_q, application_stack_area,
 			   K_THREAD_STACK_SIZEOF(application_stack_area),
 			   CONFIG_APPLICATION_WORKQUEUE_PRIORITY, NULL);
@@ -1061,24 +1059,11 @@ int main(void)
 		watchdog_init_and_start(&application_work_q);
 	}
 
-	handle_nrf_modem_lib_init_ret();
-	/* delay a bit to allow BLE logging to catch up before
-	 * connecting to cloud -- otherwise it can be hard to follow
-	 * what's happening when debugging
-	 */
-#if defined(CONFIG_BT_DEBUG)
-	 k_sleep(K_SECONDS(5));
-#endif
-	cloud_api_init();
-
 	work_init();
 #if defined(CONFIG_CPU_LOAD)
 	cpu_load_init();
 #endif
-
-#if defined(CONFIG_LTE_LINK_CONTROL)
-	lte_lc_register_handler(lte_handler);
-#endif /* defined(CONFIG_LTE_LINK_CONTROL) */
+	k_sleep(K_SECONDS(5));
 
 	while (modem_configure() != 0) {
 		LOG_WRN("Failed to establish LTE connection.");

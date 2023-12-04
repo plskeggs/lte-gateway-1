@@ -22,7 +22,7 @@
 
 /**@brief Set the external mem control pin to high to 
   * enable access to the external memory chip. */
-static int flash_test_init(const struct device *dev)
+static int flash_test_init(void)
 {
 	const struct device *port;
 	int err;

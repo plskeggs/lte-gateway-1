@@ -30,6 +30,13 @@ LOG_MODULE_REGISTER(ble_codec, CONFIG_NRF_CLOUD_GATEWAY_LOG_LEVEL);
 typedef int (*gateway_state_handler_t)(void *root_obj);
 
 extern void nrf_cloud_register_gateway_state_handler(gateway_state_handler_t handler);
+extern int nrf_cloud_modem_info_json_encode(const struct nrf_cloud_modem_info *const mod_inf,
+					    cJSON *const mod_inf_obj);
+extern int nrf_cloud_service_info_json_encode(const struct nrf_cloud_svc_info *const svc_inf,
+					      cJSON *const svc_inf_obj);
+extern int nrf_cloud_shadow_delta_response_encode(cJSON *input_obj,
+						  bool accept,
+						  struct nrf_cloud_data *const output);
 
 extern struct ble_scanned_dev ble_scanned_devices[MAX_SCAN_RESULTS];
 
@@ -1289,9 +1296,29 @@ static int gateway_state_handler(void *root_obj)
 	}
 
 	if (!changed) {
-		LOG_DBG("Ignoring gateway state change");
-		return 0;
+#if defined(ACK_DELTA)
+		int ret;
+		struct nrf_cloud_tx_data tx_data = {
+			.topic_type = NRF_CLOUD_TOPIC_STATE,
+			.qos = MQTT_QOS_1_AT_LEAST_ONCE
+		};
+
+		ret = nrf_cloud_shadow_delta_response_encode(state_obj, true, &tx_data.data);
+
+		if (ret == 0) {
+			ret = nrf_cloud_send(&tx_data);
+			nrf_cloud_free((void *)tx_data.data.ptr);
+			if (ret) {
+				LOG_ERR("nct_cc_send failed %d", ret);
+			}
+		} else {
+			LOG_ERR("Error acking shadow delta: %d", ret);
+		}
+#else
+		LOG_INF("Desired connections did not change. Ignoring delta.");
+#endif
 	}
+
 	LOG_DBG("Gateway state change detected");
 
 	ble_conn_mgr_clear_desired(false);

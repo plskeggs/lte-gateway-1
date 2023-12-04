@@ -9,7 +9,10 @@ toolchain:
 ram: 128
 flash: 192
 supported:
+  - serial
+  - spi
   - i2c
   - pwm
   - watchdog
   - netif:modem
+  - gpio

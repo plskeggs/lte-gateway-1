@@ -4,11 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/drivers/gpio.h>
-#include <zephyr/drivers/uart.h>
+#include <zephyr/kernel.h>
 #include <zephyr/device.h>
 #include <zephyr/devicetree.h>
-#include <zephyr/kernel.h>
+#include <zephyr/drivers/gpio.h>
+#include <zephyr/drivers/uart.h>
 
 #define RESET_NODE DT_NODELABEL(nrf52840_reset)
 #define BOOT_NODE DT_NODELABEL(nrf52840_boot)
@@ -230,7 +230,7 @@ int bt_hci_transport_setup(struct device *h4)
 	k_sleep(K_MSEC(10));
 
 	/* Drain bytes */
-	while (uart_fifo_read(h4, &c, 1)) {
+	while (h4 && uart_fifo_read(h4, &c, 1)) {
 		continue;
 	}
 
