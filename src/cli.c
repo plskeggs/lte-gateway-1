@@ -1,4 +1,12 @@
+#undef __XSI_VISIBLE
+#define __XSI_VISIBLE 1
+#undef _XOPEN_SOURCE
+#define _XOPEN_SOURCE 1
+#include <time.h>
+#include <malloc.h>
+#include <stdlib.h>
 #include <zephyr/kernel.h>
+#include <zephyr/linker/linker-defs.h>
 #include <zephyr/sys/printk.h>
 #include <zephyr/shell/shell.h>
 #include <zephyr/shell/shell_uart.h>
@@ -7,11 +15,7 @@
 #include <version.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/logging/log_ctrl.h>
-#include <stdlib.h>
 #include <fw_info.h>
-#undef __XSI_VISIBLE
-#define __XSI_VISIBLE 1
-#include <time.h>
 #include <zephyr/posix/time.h>
 #include <modem/modem_info.h>
 #include <nrf_modem_at.h>
@@ -26,7 +30,6 @@
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/sw_isr_table.h>
 #include <modem/lte_lc.h>
-
 #include "config.h"
 #include "nrf_cloud_transport.h"
 #include "ble.h"
@@ -124,13 +127,43 @@ void print_fw_info(const struct shell *shell, bool verbose)
 	}
 }
 
-void print_heap(bool detailed)
-{
-	extern struct k_heap _system_heap;
-	struct sys_heap *s_heap = &_system_heap.heap;
+#if defined(CONFIG_SYS_HEAP_RUNTIME_STATS)
+extern struct sys_heap _system_heap;
+#endif
 
-	printk("System Heap:\n");
-	sys_heap_print_info(s_heap, detailed);
+int heap_shell(const struct shell *shell, size_t argc, char **argv)
+{
+	struct mallinfo system_stats;
+
+#if defined(CONFIG_SYS_HEAP_RUNTIME_STATS)
+	int err;
+	struct sys_memory_stats kernel_stats;
+
+	err = sys_heap_runtime_stats_get(&_system_heap, &kernel_stats);
+	if (err) {
+		shell_error(shell, "heap: failed to read kernel heap statistics, error: %d", err);
+	} else {
+		shell_print(shell, "kernel heap statistics:");
+		shell_print(shell, "free:           %6d", kernel_stats.free_bytes);
+		shell_print(shell, "allocated:      %6d", kernel_stats.allocated_bytes);
+		shell_print(shell, "max. allocated: %6d\n", kernel_stats.max_allocated_bytes);
+	}
+#endif /* CONFIG_SYS_HEAP_RUNTIME_STATS */
+
+	/* Calculate the system heap maximum size. */
+#define USED_RAM_END_ADDR POINTER_TO_UINT(&_end)
+#define HEAP_BASE USED_RAM_END_ADDR
+#define MAX_HEAP_SIZE (KB(CONFIG_SRAM_SIZE) - (HEAP_BASE - CONFIG_SRAM_BASE_ADDRESS))
+
+	system_stats = mallinfo();
+
+	shell_print(shell, "system heap statistics:");
+	shell_print(shell, "max. size:      %6ld", MAX_HEAP_SIZE);
+	shell_print(shell, "size:           %6d", system_stats.arena);
+	shell_print(shell, "free:           %6d", system_stats.fordblks);
+	shell_print(shell, "allocated:      %6d", system_stats.uordblks);
+
+	return 0;
 }
 
 void print_modem_info(const struct shell *shell, bool creds)
@@ -902,7 +935,6 @@ static int cmd_info_gateway(const struct shell *shell, size_t argc, char **argv)
 	}
 
 	print_fw_info(shell, true);
-	print_heap(detailed);
 	return 0;
 }
 
@@ -1585,46 +1617,33 @@ void cli_init(void)
 
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_info,
 	SHELL_CMD(cloud, NULL, "Cloud information.", cmd_info_cloud),
-	SHELL_CMD(ctlr, NULL, "BLE controller information.",
-	          cmd_info_ctlr),
-	SHELL_CMD(conn, NULL, "[path] [notify] Connected Bluetooth devices "
-			      "information.",
-	          cmd_info_conn),
-	SHELL_CMD(gateway, NULL, "<verbose> Gateway information.",
-		  cmd_info_gateway),
-	SHELL_COND_CMD(CONFIG_GATEWAY_DBG_CMDS,
-		       irq, NULL, "Dump IRQ table.", cmd_info_irq),
-	SHELL_COND_CMD(CONFIG_GATEWAY_DBG_CMDS,
-		       list, &dynamic_addr,
+	SHELL_CMD(ctlr, NULL, "BLE controller information.", cmd_info_ctlr),
+	SHELL_CMD(conn, NULL, "[path] [notify] Connected Bluetooth devices information.",
+		  cmd_info_conn),
+	SHELL_CMD(gateway, NULL, "<verbose> Gateway information.", cmd_info_gateway),
+	SHELL_CMD(heap, NULL, "Print heap usage statistics.", heap_shell),
+	SHELL_COND_CMD(CONFIG_GATEWAY_DBG_CMDS, irq, NULL, "Dump IRQ table.", cmd_info_irq),
+	SHELL_COND_CMD(CONFIG_GATEWAY_DBG_CMDS, list, &dynamic_addr,
 		       "List known BLE MAC addresses.", NULL),
 	SHELL_CMD(modem, NULL, "<verbose> Modem information.", cmd_info_modem),
-	SHELL_COND_CMD(CONFIG_GATEWAY_DBG_CMDS,
-		       param, &dynamic_param,
-		       "List parameters.", NULL),
-	SHELL_CMD(scan, NULL, "Bluetooth scan results.",
-		  cmd_info_scan),
+	SHELL_COND_CMD(CONFIG_GATEWAY_DBG_CMDS, param, &dynamic_param, "List parameters.", NULL),
+	SHELL_CMD(scan, NULL, "Bluetooth scan results.", cmd_info_scan),
 	SHELL_SUBCMD_SET_END /* Array terminated. */
 );
 SHELL_CMD_REGISTER(info, &sub_info, "Informational commands", NULL);
 
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_ble,
 	SHELL_CMD(scan, NULL, "Scan for BLE devices.", cmd_ble_scan),
-	SHELL_CMD(save, NULL, "Save desired connections to shadow.",
-		  cmd_ble_save),
-	SHELL_CMD(conn, &dynamic_ble_conn,
-		  "<all | name | MAC> Connect to BLE device(s).", NULL),
-	SHELL_CMD(disc, &dynamic_ble_disc,
-		  "<all | name | MAC> Disconnect BLE device(s).", NULL),
-	SHELL_CMD(en, &dynamic_ble_en,
-		  "<all | MAC [all | handle]> Enable "
-		  "notifications on BLE device(s).", NULL),
-	SHELL_CMD(dis, &dynamic_ble_dis,
-		  "<all | MAC [all | handle]> Disable "
-		  "notifications on BLE device(s).", NULL),
+	SHELL_CMD(save, NULL, "Save desired connections to shadow.", cmd_ble_save),
+	SHELL_CMD(conn, &dynamic_ble_conn, "<all | name | MAC> Connect to BLE device(s).", NULL),
+	SHELL_CMD(disc, &dynamic_ble_disc, "<all | name | MAC> Disconnect BLE device(s).", NULL),
+	SHELL_CMD(en, &dynamic_ble_en, "<all | MAC [all | handle]> Enable "
+				       "notifications on BLE device(s).", NULL),
+	SHELL_CMD(dis, &dynamic_ble_dis, "<all | MAC [all | handle]> Disable "
+					 "notifications on BLE device(s).", NULL),
 #if CONFIG_GATEWAY_BLE_FOTA
 	SHELL_CMD(fota, &dynamic_ble_fota,
-		 "<addr> <host> <path> <size> <final> "
-		 "[ver] [crc] [sec_tag] [frag_size] [apn] "
+		 "<addr> <host> <path> <size> <final> [ver] [crc] [sec_tag] [frag_size] [apn] "
 		  "BLE firmware over-the-air update.", NULL),
 	SHELL_CMD(test, NULL, "Set BLE FOTA download test mode.", cmd_ble_test),
 #endif
@@ -1633,14 +1652,12 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_ble,
 SHELL_CMD_ARG_REGISTER(ble, &sub_ble, "Bluetooth commands", NULL, 0, 3);
 
 SHELL_CMD_ARG_REGISTER(fota, NULL, "<host> <path> [sec_tag] [frag_size] [apn] "
-				   "firmware over-the-air update.",
-		       cmd_fota, 2, 2);
+				   "firmware over-the-air update.", cmd_fota, 2, 2);
 SHELL_CMD_ARG_REGISTER(at, NULL, "<enable | AT<cmd> | exit> Execute an AT "
 				 "command.  Use <at enable> first to remain "
 				 "in AT command mode until 'exit'.",
 		       app_cmd_at, 2, SHELL_OPT_ARG_RAW);
-SHELL_CMD_ARG_REGISTER(session, NULL, "<0 | 1> Get or change persistent "
-				      "sessions flag.",
+SHELL_CMD_ARG_REGISTER(session, NULL, "<0 | 1> Get or change persistent sessions flag.",
 		       cmd_session, 0, 1);
 SHELL_CMD_REGISTER(testflash, NULL, "Test the external flash.", cmd_testflash);
 SHELL_CMD_REGISTER(reboot, NULL, "Reboot the gateway.", cmd_reboot);

@@ -863,7 +863,7 @@ static int modem_configure(void)
 	LOG_INF("Connecting to LTE network.");
 	LOG_INF("This may take several minutes.");
 
-	err = lte_lc_init_and_connect();
+	err = lte_lc_connect();
 	if (err) {
 		lte_connection_status = false;
 		LOG_ERR("LTE link could not be established.");

@@ -10,7 +10,7 @@ manifest:
     - name: sdk-nrf
       path: nrf
       remote: origin
-      revision: ncs-2.5.0-feature-fix-ble-fota
+      revision: Branch_ncs-2.5.99-feature-fix-ble-fota
       #remote: nordic
       #revision: pull/8960/head
       import: true
