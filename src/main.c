@@ -22,6 +22,7 @@
 #endif /* CONFIG_NRF_MODEM_LIB */
 #include <zephyr/net/socket.h>
 #include <net/nrf_cloud.h>
+#include <net/nrf_cloud_codec.h>
 #undef __XSI_VISIBLE
 #define __XSI_VISIBLE 1
 #include <time.h>
@@ -178,6 +179,7 @@ static void date_time_event_handler(const struct date_time_evt *evt);
 struct modem_param_info * query_modem_info(void);
 int flash_test(const struct device *dev);
 static void lte_handler(const struct lte_lc_evt *const evt);
+int gateway_state_handler(void *root_obj);
 
 bool get_lte_connection_status(void)
 {
@@ -532,6 +534,56 @@ void fota_done_handler(const struct nrf_cloud_evt *const evt)
 #endif
 }
 
+static void handle_shadow_event(struct nrf_cloud_obj_shadow_data *const shadow)
+{
+	if (!shadow) {
+		return;
+	}
+
+	int err;
+
+	if (shadow->type == NRF_CLOUD_OBJ_SHADOW_TYPE_DELTA) {
+		if (!shadow->delta) {
+			LOG_ERR("Shadow is NULL");
+			return;
+		}
+		if (!shadow->delta->state.encoded_data.ptr &&
+		    (shadow->delta->state.enc_src != NRF_CLOUD_ENC_SRC_NONE)) {
+			LOG_ERR("Encoded data ptr is NULL");
+			return;
+		}
+		if (!shadow->delta->state.json) {
+			LOG_ERR("JSON is NULL");
+			return;
+		}
+		LOG_INF("Shadow: Delta - version: %d, timestamp: %lld, %*s",
+			shadow->delta->ver,
+			shadow->delta->ts,
+			shadow->delta->state.encoded_data.len,
+			(shadow->delta->state.enc_src != NRF_CLOUD_ENC_SRC_NONE) ?
+				(const char *)shadow->delta->state.encoded_data.ptr :
+				"(not encoded)");
+
+		err = gateway_state_handler(shadow->delta->state.json);
+
+		/* Always accept since this sample, by default,
+		 * doesn't have any application specific shadow handling
+		 */
+		err = nrf_cloud_obj_shadow_delta_response_encode(&shadow->delta->state, true);
+		if (err) {
+			LOG_ERR("Failed to encode shadow response: %d", err);
+			return;
+		}
+
+		err = nrf_cloud_obj_shadow_update(&shadow->delta->state);
+		if (err) {
+			LOG_ERR("Failed to send shadow response, error: %d", err);
+		}
+	} else if (shadow->type == NRF_CLOUD_OBJ_SHADOW_TYPE_ACCEPTED) {
+		LOG_DBG("Shadow: Accepted");
+	}
+}
+
 void cloud_event_handler(const struct nrf_cloud_evt *const evt)
 {
 	switch (evt->type) {
@@ -550,9 +602,6 @@ void cloud_event_handler(const struct nrf_cloud_evt *const evt)
 		boot_write_img_confirmed();
 #endif
 		atomic_set(&cloud_association, CLOUD_ASSOCIATION_STATE_READY);
-
-		LOG_INF("Set shadow modem...");
-		set_shadow_modem(NULL);
 		break;
 	case NRF_CLOUD_EVT_ERROR:
 		LOG_INF("NRF_CLOUD_EVT_ERROR");
@@ -582,9 +631,11 @@ void cloud_event_handler(const struct nrf_cloud_evt *const evt)
 	case NRF_CLOUD_EVT_PINGRESP:
 		LOG_INF("NRF_CLOUD_EVT_PINGRESP");
 		break;
-	case NRF_CLOUD_EVT_RX_DATA_SHADOW:
-		LOG_INF("NRF_CLOUD_EVT_RX_DATA_SHADOW");
+	case NRF_CLOUD_EVT_RX_DATA_SHADOW: {
+		LOG_DBG("NRF_CLOUD_EVT_RX_DATA_SHADOW");
+		handle_shadow_event(evt->shadow);
 		break;
+	}
 	default:
 		LOG_WRN("Unknown cloud event type: %d", evt->type);
 		break;

@@ -1066,24 +1066,6 @@ int disconnect_device_by_addr(char *ble_addr)
 	return err;
 }
 
-int set_shadow_modem(void *modem)
-{
-	int err;
-
-	k_mutex_lock(&output.lock, K_FOREVER);
-	err = gateway_shadow_data_encode(modem, &output);
-	if (!err) {
-		err = gw_shadow_publish(&output.data);
-		if (err) {
-			LOG_ERR("nrf_cloud_gw_shadow_publish() failed %d", err);
-		}
-	} else {
-		LOG_ERR("gateway_shadow_data_encode() failed %d", err);
-	}
-	k_mutex_unlock(&output.lock);
-	return err;
-}
-
 int set_shadow_ble_conn(char *ble_address, bool connecting, bool connected)
 {
 	int err;

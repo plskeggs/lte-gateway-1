@@ -653,77 +653,6 @@ cleanup:
 	return ret;
 }
 
-int gateway_shadow_data_encode(void *modem_ptr, struct gw_msg *msg)
-{
-	int ret = -ENOMEM;
-	__ASSERT_NO_MSG(msg != NULL);
-	cJSON *root_obj = cJSON_CreateObject();
-	cJSON *state_obj = cJSON_CreateObject();
-	cJSON *reported_obj = cJSON_CreateObject();
-	cJSON *device_obj = cJSON_CreateObject();
-	cJSON *svc_inf_obj = cJSON_AddObjectToObjectCS(device_obj, JSON_KEY_SRVC_INFO);
-
-	if ((root_obj == NULL) || (state_obj == NULL) ||
-	    (reported_obj == NULL) || (device_obj == NULL) || (svc_inf_obj == NULL)) {
-		LOG_ERR("Error creating shadow data");
-		goto cleanup;
-	}
-
-#ifdef CONFIG_MODEM_INFO
-	struct nrf_cloud_modem_info modem = {
-		.device = NRF_CLOUD_INFO_SET,
-		.network = NRF_CLOUD_INFO_SET,
-		.sim = NRF_CLOUD_INFO_SET,
-		.mpi = (struct modem_param_info *)modem_ptr
-	};
-
-	if (modem_ptr == NULL) {
-		LOG_INF("Library will query modem info");
-	}
-	LOG_INF("encoding modem info...");
-	ret = nrf_cloud_modem_info_json_encode(&modem, device_obj);
-	if (ret < 0) {
-		goto cleanup;
-	}
-#endif
-	struct nrf_cloud_svc_info_fota fota = {
-		.application = IS_ENABLED(CONFIG_BOOTLOADER_MCUBOOT),
-		.bootloader = IS_ENABLED(CONFIG_SECURE_BOOT),
-		.modem = true,
-		._rsvd = 0
-	};
-	struct nrf_cloud_svc_info_ui ui;
-	struct nrf_cloud_svc_info info = {
-		.fota = &fota,
-		.ui = &ui
-	};
-
-	memset(&ui, 0, sizeof(ui));
-
-	LOG_INF("encoding service info...");
-	if (nrf_cloud_service_info_json_encode(&info, svc_inf_obj) < 0) {
-		goto cleanup;
-	}
-
-	CJADDREFCS(reported_obj, "device", device_obj);
-	CJADDREFCS(state_obj, "reported", reported_obj);
-	CJADDREFCS(root_obj, "state", state_obj);
-
-	CJPRINT(root_obj, (char *)msg->data.ptr, msg->data_max_len, 0);
-	msg->data.len = strlen((char *)msg->data.ptr);
-	ret = 0;
-
-cleanup:
-	if (ret) {
-		LOG_ERR("In shadow cleanup: %d", ret);
-	}
-	cJSON_Delete(device_obj);
-	cJSON_Delete(reported_obj);
-	cJSON_Delete(state_obj);
-	cJSON_Delete(root_obj);
-	return ret;
-}
-
 int device_shadow_data_encode(char *ble_address, bool connecting,
 			      bool connected, struct gw_msg *msg)
 {
@@ -1204,20 +1133,15 @@ static char *get_addr_from_des_conn_array(cJSON *array, int index)
 	return NULL;
 }
 
-static int gateway_state_handler(void *root_obj)
+int gateway_state_handler(void *root_obj)
 {
-	cJSON *state_obj;
 	cJSON *desired_connections_obj;
 
 	if (root_obj == NULL) {
 		return 0;
 	}
-	state_obj = cJSON_GetObjectItem((cJSON *)root_obj, "state");
-	if (state_obj == NULL) {
-		return 0;
-	}
 
-	desired_connections_obj = cJSON_GetObjectItem(state_obj,
+	desired_connections_obj = cJSON_GetObjectItem(root_obj,
 						      "desiredConnections");
 	if (desired_connections_obj == NULL) {
 		return 0;
