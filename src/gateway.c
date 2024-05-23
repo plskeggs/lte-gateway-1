@@ -72,7 +72,7 @@ void cloud_data_process(int unused1, int unused2, int unused3)
 
 	while (1) {
 		struct cloud_data_t *cloud_data = k_fifo_get(&cloud_data_fifo,
-							     K_NO_WAIT);
+							     K_MSEC(100));
 
 		if (cloud_data != NULL) {
 			k_mutex_lock(&lock, K_FOREVER);
@@ -117,7 +117,6 @@ void cloud_data_process(int unused1, int unused2, int unused3)
 			k_free(cloud_data);
 			k_mutex_unlock(&lock);
 		}
-		k_sleep(K_MSEC(100));
 	}
 }
 
@@ -517,6 +516,7 @@ int g2c_send(const struct nrf_cloud_data *output)
 	msg.topic_type = NRF_CLOUD_TOPIC_MESSAGE;
 	msg.qos = MQTT_QOS_1_AT_LEAST_ONCE;
 	msg.id = 0;
+	msg.obj = NULL;
 
 	return nrf_cloud_send(&msg);
 }
@@ -530,6 +530,7 @@ int gw_shadow_publish(const struct nrf_cloud_data *output)
 	msg.topic_type = NRF_CLOUD_TOPIC_STATE;
 	msg.qos = MQTT_QOS_1_AT_LEAST_ONCE;
 	msg.id = 0;
+	msg.obj = NULL;
 
 	return nrf_cloud_send(&msg);
 }

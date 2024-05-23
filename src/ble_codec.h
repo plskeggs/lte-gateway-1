@@ -39,6 +39,7 @@ int device_shadow_data_encode(char *ble_address, bool connecting,
 			      bool connected, struct gw_msg *msg);
 int gateway_desired_list_encode(struct desired_conn *desired,int num_desired,
 				struct gw_msg *msg);
+int gateway_reported_encode(struct gw_msg *msg);
 void get_uuid_str(struct uuid_handle_pair *uuid_handle, char *str, size_t len);
 char *get_time_str(char *dst, size_t len);
 void ble_codec_init(void);

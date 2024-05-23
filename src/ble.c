@@ -16,6 +16,7 @@
 #include <zephyr/bluetooth/hci.h>
 #include <dk_buttons_and_leds.h>
 #include <zephyr/settings/settings.h>
+#include <zephyr/logging/log_ctrl.h>
 
 #include "net/nrf_cloud.h"
 #include "ble.h"
@@ -477,6 +478,7 @@ static uint8_t gatt_read_callback(struct bt_conn *conn, uint8_t err,
 			sizeof(struct bt_gatt_read_params));
 		memcpy(&read_data.addr_trunc, addr_trunc, strlen(addr_trunc));
 		memcpy(&read_data.data, data, length);
+		LOG_HEXDUMP_DBG(data, length, "READ");
 
 		size_t size = sizeof(struct rec_data_t);
 
@@ -510,6 +512,7 @@ static int gatt_read_handle(bt_addr_le_t *addr, uint16_t handle, bool ccc)
 	params.single.handle = handle;
 	params.func = gatt_read_callback;
 
+	LOG_DBG("Read 0x%02X, %d", handle, ccc);
 	conn = bt_conn_lookup_addr_le(BT_ID_DEFAULT, addr);
 	if (conn == NULL) {
 		LOG_ERR("Null Conn object");
@@ -538,6 +541,7 @@ int gatt_read(char *ble_addr, char *chrc_uuid, bool ccc)
 		return err;
 	}
 
+	LOG_DBG("Read %s, 0x%02X, %d", chrc_uuid, handle, ccc);
 	return gatt_read_handle(&connected_ptr->bt_addr, handle, ccc);
 }
 
@@ -1097,10 +1101,29 @@ int set_shadow_desired_conn(struct desired_conn *desired, int num_desired)
 	if (!err) {
 		err = gw_shadow_publish(&output.data);
 		if (err) {
-			LOG_ERR("nrf_cloud_gw_shadow_publish() failed %d", err);
+			LOG_ERR("gw_shadow_publish() failed %d", err);
 		}
 	} else {
-		LOG_ERR("nrf_cloud_encode_gateway_desired_list() failed %d", err);
+		LOG_ERR("Failed %d", err);
+	}
+	k_mutex_unlock(&output.lock);
+
+	return err;
+}
+
+int set_shadow_reported_conn(void)
+{
+	int err;
+
+	k_mutex_lock(&output.lock, K_FOREVER);
+	err = gateway_reported_encode(&output);
+	if (!err) {
+		err = gw_shadow_publish(&output.data);
+		if (err) {
+			LOG_ERR("gw_shadow_publish() failed %d", err);
+		}
+	} else {
+		LOG_ERR("Failed %d", err);
 	}
 	k_mutex_unlock(&output.lock);
 

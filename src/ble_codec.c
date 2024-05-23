@@ -697,6 +697,42 @@ cleanup:
 	return ret;
 }
 
+int gateway_reported_encode(struct gw_msg *msg)
+{
+	int ret = -ENOMEM;
+	__ASSERT_NO_MSG(msg != NULL);
+
+	cJSON *root_obj = cJSON_CreateObject();
+	cJSON *state_obj = cJSON_CreateObject();
+	cJSON *reported_obj = cJSON_CreateObject();
+	cJSON *connections_obj = cJSON_CreateNull();
+	cJSON *status_connections = cJSON_CreateNull();
+
+	if ((root_obj == NULL) || (state_obj == NULL) ||
+	    (reported_obj == NULL) || (connections_obj == NULL) || (status_connections == NULL)) {
+		goto cleanup;
+	}
+	CJADDCHK(reported_obj, "desiredConnections", connections_obj);
+	CJADDCHK(reported_obj, "statusConnections", status_connections);
+	CJADDCHK(state_obj, "reported", reported_obj);
+	CJADDCHK(root_obj, "state", state_obj);
+
+	CJPRINT(root_obj, (char *)msg->data.ptr, msg->data_max_len, 0);
+	msg->data.len = strlen((char *)msg->data.ptr);
+	LOG_DBG("JSON: %s", (char *)msg->data.ptr);
+	cJSON_Delete(root_obj);
+	return 0;
+
+cleanup:
+	cJSON_Delete(status_connections);
+	cJSON_Delete(connections_obj);
+	cJSON_Delete(reported_obj);
+	cJSON_Delete(state_obj);
+	cJSON_Delete(root_obj);
+
+	return ret;
+}
+
 int gateway_desired_list_encode(struct desired_conn *desired, int num_desired,
 				struct gw_msg *msg)
 {
@@ -730,6 +766,10 @@ int gateway_desired_list_encode(struct desired_conn *desired, int num_desired,
 			CJADDARROBJ(connections_obj, item);
 			CJADDSTRCS(item, "id", desired[i].addr);
 		}
+	}
+
+	if (!num_desired) {
+		connections_obj = cJSON_CreateNull();
 	}
 
 	CJADDCHK(desired_obj, "desiredConnections", connections_obj);

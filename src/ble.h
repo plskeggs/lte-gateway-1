@@ -59,6 +59,7 @@ int get_num_scan_results(void);
 int get_num_scan_names(void);
 void ble_stop_activity(void);
 int set_shadow_desired_conn(struct desired_conn *desired, int num_desired);
+int set_shadow_reported_conn(void);
 int set_shadow_ble_conn(char *ble_address, bool connecting, bool connected);
 int set_shadow_modem(void *modem);
 

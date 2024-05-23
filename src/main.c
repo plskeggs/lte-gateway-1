@@ -586,6 +586,8 @@ static void handle_shadow_event(struct nrf_cloud_obj_shadow_data *const shadow)
 
 void cloud_event_handler(const struct nrf_cloud_evt *const evt)
 {
+	int err;
+
 	switch (evt->type) {
 	case NRF_CLOUD_EVT_TRANSPORT_CONNECTED:
 	case NRF_CLOUD_EVT_TRANSPORT_CONNECTING:
@@ -602,6 +604,10 @@ void cloud_event_handler(const struct nrf_cloud_evt *const evt)
 		boot_write_img_confirmed();
 #endif
 		atomic_set(&cloud_association, CLOUD_ASSOCIATION_STATE_READY);
+		err = set_shadow_reported_conn();
+		if (err) {
+			LOG_ERR("Error reporting no desired connections");
+		}
 		break;
 	case NRF_CLOUD_EVT_ERROR:
 		LOG_INF("NRF_CLOUD_EVT_ERROR");
